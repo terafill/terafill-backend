@@ -1,5 +1,42 @@
 # keylance-backend
 
+├── app
+│   ├── config.py
+│   ├── crud
+│   │   ├── __init__.py
+│   │   ├── item.py
+│   │   ├── master_password.py
+│   │   ├── user.py
+│   │   └── vault.py
+│   ├── database.py
+│   ├── __init__.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   ├── item.py
+│   │   ├── master_password.py
+│   │   ├── password_history.py
+│   │   ├── user.py
+│   │   └── vault.py
+│   ├── schemas
+│   │   ├── __init__.py
+│   │   ├── item.py
+│   │   ├── master_password.py
+│   │   ├── user.py
+│   │   └── vault.py
+│   ├── utils
+│   │   └── security.py
+│   └── views
+│       ├── __init__.py
+│       ├── item.py
+│       ├── master_password.py
+│       ├── password_history.py
+│       ├── user.py
+│       └── vault.py
+├── README.md
+├── requirements.txt
+└── run.py
+
+
 
 
 ## Getting started
