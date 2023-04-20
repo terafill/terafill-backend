@@ -9,11 +9,11 @@ def get_master_password(db: Session, user_id: int):
 
 def create_master_password(
     db: Session,
-    master_password: schemas.MasterPasswordCreate,
+    password_hash: str,
     user_id: int):
     db_master_password = models.MasterPassword(
         user_id=user_id,
-        password_hash=master_password.password_hash,
+        password_hash=password_hash,
         )
     db.add(db_master_password)
     db.commit()

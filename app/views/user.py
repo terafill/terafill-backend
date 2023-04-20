@@ -100,7 +100,7 @@ def delete_item(vault_id: int, item_id: int, db: Session = Depends(get_db), curr
 
 @router.post("/users/me/master-password/", response_model=schemas.MasterPassword)
 def create_master_password_for_user(master_password: schemas.MasterPasswordCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return crud.create_master_password(db=db, user_id=current_user.id, master_password=master_password)
+    return crud.create_master_password(db=db, user_id=current_user.id, password_hash=master_password.password_hash)
 
 
 @router.get("/users/me/master-password/", response_model=schemas.MasterPassword)
