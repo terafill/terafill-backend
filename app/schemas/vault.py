@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 
 class VaultBase(BaseModel):
     name: Optional[str] = None
@@ -16,8 +16,8 @@ class VaultUpdate(VaultBase):
 
 
 class Vault(VaultBase):
-    id: int
-    creator_id: int
+    id: UUID4
+    creator_id: UUID4
     created_at: datetime
     class Config:
         orm_mode = True

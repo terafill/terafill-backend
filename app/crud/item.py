@@ -1,23 +1,28 @@
+import uuid
+
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
 
 
-def get_item(db: Session, user_id: int, vault_id: int, item_id: int):
+def get_item(db: Session, user_id: str, vault_id: str, item_id: str):
     return db.query(models.Item)\
         .filter(models.Item.vault_id == vault_id)\
         .filter(models.Item.creator_id == user_id)\
         .filter(models.Item.id == item_id).first()
 
 
-def get_items(db: Session, user_id: int, vault_id: int,  skip: int = 0, limit: int = 100):
+def get_items(db: Session, user_id: str, vault_id: str,  skip: int = 0, limit: int = 100):
     return db.query(models.Item)\
         .filter(models.Item.vault_id == vault_id)\
         .filter(models.Item.creator_id == user_id)\
         .offset(skip).limit(limit).all()
 
 
-def create_item(db: Session, item: schemas.ItemCreate, vault_id: int, creator_id: int):
+def create_item(db: Session, item: schemas.ItemCreate, vault_id: str, creator_id: str):
+
+    item_id = uuid.uuid4()
+
     db_item = models.Item(
         title=item.title,
         description=item.description,
@@ -28,7 +33,8 @@ def create_item(db: Session, item: schemas.ItemCreate, vault_id: int, creator_id
         type=item.type,
         tags=item.tags,
         creator_id=creator_id,
-        vault_id=vault_id
+        vault_id=vault_id,
+        id=item_id,
         )
     db.add(db_item)
     db.commit()

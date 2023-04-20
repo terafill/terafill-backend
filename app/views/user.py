@@ -40,7 +40,7 @@ def read_vaults(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), 
 
 
 @router.get("/users/me/vaults/{vault_id}", response_model=schemas.Vault, tags=["current_user"])
-def read_vault(vault_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_vault(vault_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     vault = crud.get_vault(db, vault_id=vault_id)
     if vault is None:
         raise HTTPException(status_code=404, detail="Vault not found")
@@ -48,7 +48,7 @@ def read_vault(vault_id: int, db: Session = Depends(get_db), current_user: model
 
 
 @router.put("/users/me/vaults/{vault_id}", response_model=schemas.Vault, tags=["current_user"])
-def update_vault(vault_id: int, vault: schemas.VaultUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def update_vault(vault_id: str, vault: schemas.VaultUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_vault = crud.get_vault(db, vault_id=vault_id)
     if db_vault is None:
         raise HTTPException(status_code=404, detail="Vault not found")
@@ -56,25 +56,25 @@ def update_vault(vault_id: int, vault: schemas.VaultUpdate, db: Session = Depend
 
 
 @router.delete("/users/me/vaults/{vault_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["current_user"])
-def delete_vault(vault_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def delete_vault(vault_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_vault = crud.get_vault(db, vault_id=vault_id)
     if db_vault is None:
         raise HTTPException(status_code=404, detail="Vault not found")
     crud.delete_vault(db=db, db_vault=db_vault)
 
 @router.post("/users/me/vaults/{vault_id}/items/", response_model=schemas.Item, tags=["current_user"])
-def create_item(vault_id: int, item: schemas.ItemCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def create_item(vault_id: str, item: schemas.ItemCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return crud.create_item(db=db, item=item, vault_id=vault_id, creator_id=current_user.id)
 
 
 @router.get("/users/me/vaults/{vault_id}/items/", response_model=List[schemas.Item], tags=["current_user"])
-def read_items(vault_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_items(vault_id: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     items = crud.get_items(db, user_id=current_user.id, vault_id=vault_id, skip=skip, limit=limit)
     return items
 
 
 @router.get("/users/me/vaults/{vault_id}/items/{item_id}", response_model=schemas.Item, tags=["current_user"])
-def read_item(vault_id: int, item_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_item(vault_id: str, item_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     item = crud.get_item(db, user_id=current_user.id, vault_id=vault_id, item_id=item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -82,7 +82,7 @@ def read_item(vault_id: int, item_id: int, db: Session = Depends(get_db), curren
 
 
 @router.put("/users/me/vaults/{vault_id}/items/{item_id}", response_model=schemas.Item, tags=["current_user"])
-def update_item(vault_id: int, item_id: int, item: schemas.ItemUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def update_item(vault_id: str, item_id: str, item: schemas.ItemUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_item = crud.get_item(db, user_id=current_user.id, vault_id=vault_id, item_id=item_id)
     if db_item is None:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -90,7 +90,7 @@ def update_item(vault_id: int, item_id: int, item: schemas.ItemUpdate, db: Sessi
 
 
 @router.delete("/users/me/vaults/{vault_id}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["current_user"])
-def delete_item(vault_id: int, item_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def delete_item(vault_id: str, item_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_item = crud.get_item(db, user_id=current_user.id, vault_id=vault_id, item_id=item_id)
     if db_item is None:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -143,7 +143,7 @@ def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), c
 
 
 @router.get("/users/{user_id}", response_model=schemas.User)
-def read_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_user(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = crud.get_user(db=db, user_id=user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -151,7 +151,7 @@ def read_user(user_id: int, db: Session = Depends(get_db), current_user: models.
 
 
 @router.put("/users/{user_id}", response_model=schemas.User)
-def update_user(user_id: int, user: schemas.UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def update_user(user_id: str, user: schemas.UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -161,7 +161,7 @@ def update_user(user_id: int, user: schemas.UserUpdate, db: Session = Depends(ge
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def delete_user(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")

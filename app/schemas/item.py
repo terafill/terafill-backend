@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, Union, List
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 from enum import Enum
 
 class ItemType(str, Enum):
@@ -33,7 +33,7 @@ class ItemUpdate(ItemBase):
     pass
 
 class Item(ItemBase):
-    id: int
+    id: UUID4
     creator_id: int
     created_at: datetime
 

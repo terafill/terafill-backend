@@ -19,7 +19,7 @@ class ItemType(str, PyEnum):
 
 class Item(Base):
     __tablename__ = "items"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String(128), primary_key=True, index=True)
     title = Column(String(100), index=True)
     description = Column(String(255))
     username = Column(String(255))

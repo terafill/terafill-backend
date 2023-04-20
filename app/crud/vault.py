@@ -1,9 +1,11 @@
+import uuid
+
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
 
 
-def get_vault(db: Session, vault_id: int):
+def get_vault(db: Session, vault_id: str):
     return db.query(models.Vault).filter(models.Vault.id == vault_id).first()
 
 
@@ -15,11 +17,13 @@ def get_vaults(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Vault).offset(skip).limit(limit).all()
 
 
-def create_vault(db: Session, vault: schemas.VaultCreate, current_user: schemas.User):
+def create_vault(db: Session, vault: schemas.VaultCreate, creator_id: str):
+    vault_id = uuid.uuid4()
     db_vault = models.Vault(
         name=vault.name,
         tags=vault.tags,
-        creator_id=current_user.id,
+        creator_id=creator_id,
+        id=vault_id,
         )
     db.add(db_vault)
     db.commit()
