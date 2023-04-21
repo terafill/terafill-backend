@@ -78,6 +78,8 @@ def get_random_password():
 
 def get_cognito_user(email):
     user_id = None
+    first_name = None
+    last_name = None
 
     get_user_response = cognito_client.admin_get_user(
         UserPoolId=USER_POOL_ID,
@@ -87,11 +89,15 @@ def get_cognito_user(email):
     for attributes in get_user_response["UserAttributes"]:
         if attributes["Name"] == "sub":
             user_id = attributes["Value"]
+        if attributes["Name"] == "given_name":
+            first_name = attributes["Value"]
+        if attributes["Name"] == "family_name":
+            last_name = attributes["Value"]
 
     # Check the user's status
     user_status = get_user_response["UserStatus"]
 
-    return user_id, user_status
+    return user_id, user_status, first_name, last_name
 
 @router.post("/auth/signup/", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
 def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
@@ -116,32 +122,26 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
             ],
         )
 
-        user_id, user_status = get_cognito_user(email)
+        user_id, user_status, first_name, last_name = get_cognito_user(email)
 
     except ClientError as e:
         if e.response['Error']['Code'] == 'UsernameExistsException':
             if not user_status:
-                user_id, user_status = get_cognito_user(email)
+                user_id, user_status, first_name, last_name = get_cognito_user(email)
             if user_status == 'UNCONFIRMED':
                send_code_response = cognito_client.resend_confirmation_code(
                     ClientId=COGNITO_CLIENT_ID,
                     SecretHash=get_secret_hash(email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET),
                     Username=email
                 )
+
             elif user_status == 'CONFIRMED':
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered.")
             else:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Something went wrong. Please try again.")
-    finally:
-        if not user_id:
-            user_id, user_status = get_cognito_user(email)
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Something went wrong. Please try again.")
 
-        user = schemas.UserCreate(
-            id=user_id,
-            email=email,
-            first_name=first_name,
-            last_name=last_name)
-        crud.create_user(db=db, user=user)
 
 # Endpoint for verifying email code
 @router.post("/auth/email-verification/", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
@@ -157,9 +157,27 @@ def verify_email_code(email_verification_request: EmailVerificationRequest, db: 
             Username=email,
             ConfirmationCode=verification_code,
         )
-
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'CodeMismatchException':
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code provided, please try again.")
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong: {e}")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong: {e}")
+    else:
+        user_id = None
+        db_user = crud.get_user_by_email(db, email=email)
+        if not db_user:
+            if not user_id:
+                user_id, user_status, first_name, last_name = get_cognito_user(email)
+
+
+            user = schemas.UserCreate(
+                id=user_id,
+                email=email,
+                first_name=first_name,
+                last_name=last_name)
+            crud.create_user(db=db, user=user)
 
 
 class CreatePasswordRequest(BaseModel):
@@ -173,7 +191,7 @@ def create_password(create_password_request: CreatePasswordRequest, db: Session 
     email = create_password_request.email
     master_password = create_password_request.master_password
 
-    user_id, _ = get_cognito_user(email)
+    user_id, user_status, first_name, last_name = get_cognito_user(email)
 
     crud.create_master_password(
         db=db,
