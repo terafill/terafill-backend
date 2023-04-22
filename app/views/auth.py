@@ -244,24 +244,32 @@ class LoginRequest(BaseModel):
 @router.post("/auth/login/", status_code=status.HTTP_200_OK, tags=["auth"])
 def login(login_request: LoginRequest):
 
-    email = login_request.email
-    master_password = login_request.master_password
+    try:
+        email = login_request.email
+        master_password = login_request.master_password
 
-    login_response = cognito_client.initiate_auth(
-        AuthFlow="USER_PASSWORD_AUTH",
-        ClientId=COGNITO_CLIENT_ID,
-        AuthParameters={
-            "USERNAME": email,
-            "PASSWORD": master_password,
-            "SECRET_HASH": get_secret_hash(email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
+        login_response = cognito_client.initiate_auth(
+            AuthFlow="USER_PASSWORD_AUTH",
+            ClientId=COGNITO_CLIENT_ID,
+            AuthParameters={
+                "USERNAME": email,
+                "PASSWORD": master_password,
+                "SECRET_HASH": get_secret_hash(email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
+            }
+        )
+
+        return {
+            "accessToken": login_response["AuthenticationResult"]["AccessToken"],
+            "idToken": login_response["AuthenticationResult"]["IdToken"],
+            "refreshToken": login_response["AuthenticationResult"]["RefreshToken"]
         }
-    )
-
-    return {
-        "accessToken": login_response["AuthenticationResult"]["AccessToken"],
-        "idToken": login_response["AuthenticationResult"]["IdToken"],
-        "refreshToken": login_response["AuthenticationResult"]["RefreshToken"]
-    }
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NotAuthorizedException':
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect username or password.")
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong: {e}")
 
 class LogoutRequest(BaseModel):
     access_token: str
@@ -300,3 +308,14 @@ def login_refresh(login_refresh_request: LoginRefreshRequest):
         "accessToken": response["AuthenticationResult"]["AccessToken"],
         "idToken": response["AuthenticationResult"]["IdToken"],
     }
+
+
+@router.get('/auth/status', status_code=status.HTTP_200_OK, tags=["auth"])
+async def auth_status(token: str):
+    try:
+        response = cognito_client.get_user(
+            AccessToken=token,
+        )
+        return {'logged_in': True}
+    except:
+        return {'logged_in': False}
