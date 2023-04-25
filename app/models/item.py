@@ -28,8 +28,8 @@ class Item(Base):
     tags = Column(JSON, nullable=True)
     notes = Column(String(1024))
     type = Column(Enum(ItemType, name="item_type"))
-    vault_id = Column(Integer, ForeignKey("vaults.id"))
-    creator_id = Column(Integer, ForeignKey("users.id"))
+    vault_id = Column(String(128), ForeignKey("vaults.id"))
+    creator_id = Column(String(128), ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # vault = relationship("Vault", back_populates="items")

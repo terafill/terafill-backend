@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 
 class MasterPasswordBase(BaseModel):
     password_hash: str
@@ -15,7 +15,7 @@ class MasterPasswordUpdate(MasterPasswordBase):
 
 
 class MasterPassword(MasterPasswordBase):
-    user_id: int
+    user_id: UUID4
     created_at: datetime
 
     class Config:

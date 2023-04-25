@@ -34,7 +34,7 @@ class ItemUpdate(ItemBase):
 
 class Item(ItemBase):
     id: UUID4
-    creator_id: int
+    creator_id: UUID4
     created_at: datetime
 
     class Config:
