@@ -13,8 +13,10 @@ def get_vault(db: Session, vault_id: str):
 #     return db.query(models.User).filter(models.User.email == email).first()
 
 
-def get_vaults(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Vault).offset(skip).limit(limit).all()
+def get_vaults(db: Session, user_id: str, skip: int = 0, limit: int = 100):
+    return db.query(models.Vault)\
+        .filter(models.Vault.creator_id == user_id)\
+        .offset(skip).limit(limit).all()
 
 
 def create_vault(db: Session, vault: schemas.VaultCreate, creator_id: str):

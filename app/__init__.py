@@ -12,6 +12,7 @@ from .views import (
     # master_password
     auth,
     icon,
+    access_control,
     )
 
 
@@ -23,9 +24,10 @@ Base.metadata.create_all(bind=engine)
 
 # app.include_router(item.router, prefix="/api/v1")
 app.include_router(user.router, prefix="/api/v1")
-app.include_router(vault.router, prefix="/api/v1")
+# app.include_router(vault.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(icon.router, prefix="/api/v1")
+app.include_router(access_control.router, prefix="/api/v1")
 # app.include_router(master_password.router, prefix="/api/v1")
 
 

@@ -29,3 +29,8 @@ from .master_password import (
     update_master_password,
     delete_master_password,
     )
+
+from .access_control import (
+    get_all_vault_permissions_by_user_id,
+    get_vault_permissions_by_user_id
+    )

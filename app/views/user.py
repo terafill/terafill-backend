@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..database import SessionLocal, engine
 from .. import models, schemas, crud
-from ..utils.security import get_current_user, get_current_user, get_token, security_scheme
+from ..utils.security import get_current_user, get_token, security_scheme
 from ..database import get_db
 
 router = APIRouter(tags=["user"])
@@ -35,7 +35,7 @@ def create_vault(vault: schemas.VaultCreate, db: Session = Depends(get_db), curr
 
 @router.get("/users/me/vaults/", response_model=List[schemas.Vault], tags=["current_user"])
 def read_vaults(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    vaults = crud.get_vaults(db, skip=skip, limit=limit)
+    vaults = crud.get_vaults(db, user_id=current_user.id, skip=skip, limit=limit)
     return vaults
 
 
