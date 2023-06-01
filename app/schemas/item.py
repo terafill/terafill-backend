@@ -39,6 +39,7 @@ class Item(ItemBase):
     id: UUID4
     creator_id: UUID4
     created_at: datetime
+    vault_id: UUID4
 
     class Config:
         orm_mode = True

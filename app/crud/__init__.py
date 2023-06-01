@@ -10,6 +10,7 @@ from .user import (
 from .vault import (
     get_vault,
     get_vaults,
+    get_vaults_by_user_id,
     create_vault,
     update_vault,
     delete_vault,

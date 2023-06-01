@@ -37,7 +37,7 @@ def create_vault(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    return crud.create_vault(db=db, vault=vault, current_user=current_user)
+    return crud.create_vault(db=db, vault=vault, creator_id=current_user.id)
 
 
 @router.get(
@@ -49,7 +49,7 @@ def read_vaults(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    vaults = crud.get_vaults(db, skip=skip, limit=limit)
+    vaults = crud.get_vaults_by_user_id(db, user_id=current_user.id, skip=skip, limit=limit)
     return vaults
 
 
