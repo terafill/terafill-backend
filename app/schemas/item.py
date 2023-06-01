@@ -3,6 +3,7 @@ from typing import Optional, Union, List
 from pydantic import BaseModel, UUID4
 from enum import Enum
 
+
 class ItemType(str, Enum):
     PASSWORD = "PASSWORD"
     NOTE = "NOTE"
@@ -29,8 +30,10 @@ class ItemBase(BaseModel):
 class ItemCreate(ItemBase):
     title: str
 
+
 class ItemUpdate(ItemBase):
     pass
+
 
 class Item(ItemBase):
     id: UUID4

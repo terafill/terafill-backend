@@ -11,18 +11,31 @@ router = APIRouter(tags=["vault"])
 
 
 @router.post("/vaults/", response_model=schemas.Vault)
-def create_vault(vault: schemas.VaultCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def create_vault(
+    vault: schemas.VaultCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     return crud.create_vault(db=db, vault=vault, current_user=current_user)
 
 
 @router.get("/vaults/", response_model=List[schemas.Vault])
-def read_vaults(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_vaults(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     vaults = crud.get_vaults(db, skip=skip, limit=limit)
     return vaults
 
 
 @router.get("/vaults/{vault_id}", response_model=schemas.Vault)
-def read_vault(vault_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_vault(
+    vault_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     vault = crud.get_vault(db, vault_id=vault_id)
     if vault is None:
         raise HTTPException(status_code=404, detail="Vault not found")
@@ -30,7 +43,12 @@ def read_vault(vault_id: int, db: Session = Depends(get_db), current_user: model
 
 
 @router.put("/vaults/{vault_id}", response_model=schemas.Vault)
-def update_vault(vault_id: int, vault: schemas.VaultUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def update_vault(
+    vault_id: int,
+    vault: schemas.VaultUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     db_vault = crud.get_vault(db, vault_id=vault_id)
     if db_vault is None:
         raise HTTPException(status_code=404, detail="Vault not found")
@@ -38,7 +56,11 @@ def update_vault(vault_id: int, vault: schemas.VaultUpdate, db: Session = Depend
 
 
 @router.delete("/vaults/{vault_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_vault(vault_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def delete_vault(
+    vault_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     db_vault = crud.get_vault(db, vault_id=vault_id)
     if db_vault is None:
         raise HTTPException(status_code=404, detail="Vault not found")

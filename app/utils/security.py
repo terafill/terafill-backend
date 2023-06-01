@@ -15,11 +15,13 @@ from ..database import db
 def get_db():
     yield db
 
-AWS_REGION_NAME = os.environ['AWS_REGION_NAME']
+
+AWS_REGION_NAME = os.environ["AWS_REGION_NAME"]
 USER_POOL_ID = os.environ["USER_POOL_ID"]
 
 
 security_scheme = HTTPBearer()
+
 
 def get_keys():
     # Get the public keys from Amazon Cognito
@@ -31,15 +33,18 @@ def get_keys():
     keys = response.json()["keys"]
     return keys
 
+
 # Dependency to extract the JWT access token from the HTTP request
 async def get_token(token: str = Security(security_scheme)):
     if hasattr(token, "credentials"):
         return token.credentials
     return {}
 
-# Dependency to get the current user from the JWT access token
-async def get_current_user(db: Session = Depends(get_db), token: str = Depends(get_token)):
 
+# Dependency to get the current user from the JWT access token
+async def get_current_user(
+    db: Session = Depends(get_db), token: str = Depends(get_token)
+):
     # Check if the token was provided
     if not token:
         raise HTTPException(status_code=401, detail="Access token missing")
@@ -61,7 +66,10 @@ async def get_current_user(db: Session = Depends(get_db), token: str = Depends(g
             public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(key))
             decoded_token = jwt.decode(token, public_key, algorithms=["RS256"])
         else:
-            raise HTTPException(status_code=401, detail="Unable to find key to verify access token signature")
+            raise HTTPException(
+                status_code=401,
+                detail="Unable to find key to verify access token signature",
+            )
     except Exception as e:
         print(e)
         raise HTTPException(status_code=401, detail="Access token invalid")
@@ -74,9 +82,9 @@ async def get_current_user(db: Session = Depends(get_db), token: str = Depends(g
             raise HTTPException(status_code=404, detail="User not found")
 
         return db_user
-    except JWTError:
+    except Exception as e:
         # Raise an HTTPException if the token is invalid
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
+            detail=f"Invalid authentication credentials: {e}",
         )

@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 
 from ..database import Base
 
+
 class Vault(Base):
     __tablename__ = "vaults"
     id = Column(String(128), primary_key=True, index=True)

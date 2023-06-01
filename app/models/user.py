@@ -7,6 +7,7 @@ from sqlalchemy.sql import func
 
 from ..database import Base
 
+
 class Gender(str, PyEnum):
     male = "male"
     female = "female"
@@ -24,6 +25,7 @@ class Gender(str, PyEnum):
     questioning = "questioning"
     other = "other"
 
+
 class User(Base):
     __tablename__ = "users"
     id = Column(String(128), primary_key=True, index=True)
@@ -33,7 +35,7 @@ class User(Base):
     first_name = Column(String(100))
     last_name = Column(String(100))
     birthday = Column(Date)
-    gender = Column(Enum(Gender, name='gender'))
+    gender = Column(Enum(Gender, name="gender"))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # master_password = relationship("MasterPassword", back_populates="user")

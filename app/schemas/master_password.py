@@ -3,12 +3,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, UUID4
 
+
 class MasterPasswordBase(BaseModel):
     password_hash: str
 
 
 class MasterPasswordCreate(MasterPasswordBase):
     password_hash: str
+
 
 class MasterPasswordUpdate(MasterPasswordBase):
     password_hash: str

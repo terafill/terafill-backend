@@ -27,14 +27,14 @@ def create_user(db: Session, user: schemas.UserCreate):
         gender=user.gender,
         birthday=user.birthday,
         id=user.id,
-        )
+    )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
 
 
-def update_user(db: Session, db_user: schemas.User ,user: schemas.UserUpdate):
+def update_user(db: Session, db_user: schemas.User, user: schemas.UserUpdate):
     for field, value in user.dict(exclude_unset=True).items():
         setattr(db_user, field, value)
     db.commit()

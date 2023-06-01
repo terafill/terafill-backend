@@ -24,14 +24,14 @@ def create_vault(db: Session, vault: schemas.VaultCreate, creator_id: str):
         tags=vault.tags,
         creator_id=creator_id,
         id=vault_id,
-        )
+    )
     db.add(db_vault)
     db.commit()
     db.refresh(db_vault)
     return db_vault
 
 
-def update_vault(db: Session, db_vault: schemas.Vault ,vault: schemas.VaultUpdate):
+def update_vault(db: Session, db_vault: schemas.Vault, vault: schemas.VaultUpdate):
     for field, value in vault.dict(exclude_unset=True).items():
         setattr(db_vault, field, value)
     db.commit()
