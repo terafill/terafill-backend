@@ -3,6 +3,7 @@ from .user import (
     get_users,
     create_user,
     get_user_by_email,
+    get_user_by_sub,
     update_user,
     delete_user,
 )
@@ -16,7 +17,13 @@ from .vault import (
     delete_vault,
 )
 
-from .item import get_item, get_items, create_item, update_item, delete_item
+from .item import (
+    get_item,
+    get_items,
+    create_item,
+    update_item,
+    delete_item
+)
 
 from .master_password import (
     get_master_password,

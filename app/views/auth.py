@@ -2,29 +2,21 @@ import os
 import hmac
 import hashlib
 import base64
-import string
-import secrets
-import random
-from typing import List, Optional
+import logging
 
 
 import boto3
-import redis
-from jose import jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from botocore.exceptions import ClientError
-from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import APIRouter, Depends, HTTPException, status
 
 
-from .. import models, schemas, crud
+from .. import schemas, crud
 from ..database import get_db
-from ..utils.security import get_current_user, get_token, security_scheme
 
 
 router = APIRouter()
-# redis_client = redis.Redis(decode_responses=True)
 
 # Set up AWS credentials
 AWS_ACCESS_KEY_ID = os.environ["AWS_ACCESS_KEY_ID"]
@@ -45,19 +37,17 @@ COGNITO_CLIENT_SECRET = os.environ["COGNITO_CLIENT_SECRET"]
 USER_POOL_ID = os.environ["USER_POOL_ID"]
 cognito_client = session.client("cognito-idp", region_name=AWS_REGION_NAME)
 
-# ses_client = session.client('ses', region_name=AWS_REGION_NAME)  # Replace with your desired region
 
-
-# Model for email verification request
-class SignupRequest(BaseModel):
+class SignupRequest(BaseModel):  # Model for email verification request
     email: str
     first_name: str
     last_name: str
+    password: str
 
 
-# Model for email verification code request
-class EmailVerificationRequest(BaseModel):
+class SignupConfirmationRequest(BaseModel):  # Model for email verification code request
     email: str
+    password: str
     verification_code: str
 
 
@@ -69,16 +59,6 @@ def get_secret_hash(username, client_id, client_secret):
         digestmod=hashlib.sha256,
     ).digest()
     return base64.b64encode(digest).decode()
-
-
-def get_random_password():
-    # define the possible characters to choose from
-    alphabet = string.ascii_letters + string.digits + string.punctuation
-
-    # generate a random password of length 12
-    password = "".join(secrets.choice(alphabet) for i in range(16))
-
-    return password
 
 
 def get_cognito_user(email):
@@ -111,67 +91,81 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
         first_name = signup_request.first_name
         last_name = signup_request.last_name
         secret_hash = get_secret_hash(email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
-        password = get_random_password()
-        user_id = None
-        user_status = None
+        password = signup_request.password
+        user_type = None
 
-        signup_response = cognito_client.sign_up(
-            ClientId=COGNITO_CLIENT_ID,
-            SecretHash=secret_hash,
-            Username=email,
-            Password=password,
-            UserAttributes=[
-                {"Name": "email", "Value": email},
-                {"Name": "given_name", "Value": first_name},
-                {"Name": "family_name", "Value": last_name},
-            ],
-        )
+        """
+        Signup with cognito required when user is new or need_sign_up
+        """
 
-        user_id, user_status, first_name, last_name = get_cognito_user(email)
-
-    except ClientError as e:
-        if e.response["Error"]["Code"] == "UsernameExistsException":
-            if not user_status:
-                user_id, user_status, first_name, last_name = get_cognito_user(email)
-            if user_status == "UNCONFIRMED":
-                send_code_response = cognito_client.resend_confirmation_code(
-                    ClientId=COGNITO_CLIENT_ID,
-                    SecretHash=get_secret_hash(
-                        email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET
-                    ),
-                    Username=email,
-                )
-
-            elif user_status == "CONFIRMED":
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Email already registered.",
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Something went wrong. Please try again.",
-                )
+        user = crud.get_user_by_email(db, email)
+        if not user:  # new user
+            user_data = schemas.UserCreate(
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                status="unconfirmed")
+            user = crud.create_user(db, user_data)
+            user_type = "new"
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Something went wrong. Please try again.",
+            user_type = user.status
+
+        if user_type in ["new", "need_sign_up"]:
+            cognito_client.sign_up(
+                ClientId=COGNITO_CLIENT_ID,
+                SecretHash=secret_hash,
+                Username=email,
+                Password=password,
+                UserAttributes=[
+                    {"Name": "email", "Value": email},
+                    {"Name": "given_name", "Value": first_name},
+                    {"Name": "family_name", "Value": last_name},
+                    # {"Name": "custom:user_id", "Value": user.id},
+                ],
             )
+
+        elif user_type == "unconfirmed":
+            cognito_client.resend_confirmation_code(
+                ClientId=COGNITO_CLIENT_ID,
+                SecretHash=get_secret_hash(
+                    email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET
+                ),
+                Username=email,
+            )
+
+        elif user_type == "confirmed":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered.",
+            )
+        elif user_type == "deactivated":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email is deactivated. Please contact support for resolution.",
+            )
+
+    except Exception as e:
+        logging.error(f"Something went wrong {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Something went wrong. Please try again.",
+        )
 
 
 # Endpoint for verifying email code
 @router.post(
-    "/auth/email-verification/", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"]
+    "/auth/signup/confirm/", status_code=status.HTTP_200_OK, tags=["auth"]
 )
-def verify_email_code(
-    email_verification_request: EmailVerificationRequest, db: Session = Depends(get_db)
+def confirm_sign_up(
+    signup_confirmation_request: SignupConfirmationRequest, db: Session = Depends(get_db)
 ):
     try:
-        email = email_verification_request.email
-        verification_code = email_verification_request.verification_code
+        email = signup_confirmation_request.email
+        verification_code = signup_confirmation_request.verification_code
+        password = signup_confirmation_request.password
         secret_hash = get_secret_hash(email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
 
-        response = cognito_client.confirm_sign_up(
+        cognito_client.confirm_sign_up(
             ClientId=COGNITO_CLIENT_ID,
             SecretHash=secret_hash,
             Username=email,
@@ -193,16 +187,41 @@ def verify_email_code(
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong: {e}"
         )
     else:
-        user_id = None
-        db_user = crud.get_user_by_email(db, email=email)
-        if not db_user:
-            if not user_id:
-                user_id, user_status, first_name, last_name = get_cognito_user(email)
+        db_user = crud.get_user_by_email(db, email)
+        sub, user_status, first_name, last_name = get_cognito_user(email)
+        user_id = db_user.id
 
-            user = schemas.UserCreate(
-                id=user_id, email=email, first_name=first_name, last_name=last_name
-            )
-            crud.create_user(db=db, user=user)
+        user = schemas.UserUpdate(sub=sub, status="confirmed")
+        crud.update_user(db=db, db_user=db_user, user=user)
+
+        login_response = cognito_client.initiate_auth(
+            AuthFlow="USER_PASSWORD_AUTH",
+            ClientId=COGNITO_CLIENT_ID,
+            AuthParameters={
+                "USERNAME": email,
+                "PASSWORD": password,
+                "SECRET_HASH": get_secret_hash(
+                    email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET
+                ),
+            },
+        )
+        vault = schemas.VaultCreate(name="default", is_default=True)
+        db_vault = crud.create_vault(db, vault, creator_id=user_id)
+
+        item = schemas.ItemCreate(
+            title="Keylance Master Password",
+            username=email,
+            password=password,
+            description="This is master password for your Keylance account",
+            type="PASSWORD",
+        )
+        crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
+
+        return {
+            "accessToken": login_response["AuthenticationResult"]["AccessToken"],
+            "idToken": login_response["AuthenticationResult"]["IdToken"],
+            "refreshToken": login_response["AuthenticationResult"]["RefreshToken"],
+        }
 
 
 class CreatePasswordRequest(BaseModel):
@@ -210,54 +229,54 @@ class CreatePasswordRequest(BaseModel):
     master_password: str
 
 
-@router.post(
-    "/auth/create-password/", status_code=status.HTTP_201_CREATED, tags=["auth"]
-)
-def create_password(
-    create_password_request: CreatePasswordRequest, db: Session = Depends(get_db)
-):
-    email = create_password_request.email
-    master_password = create_password_request.master_password
+# @router.post(
+#     "/auth/create-password/", status_code=status.HTTP_201_CREATED, tags=["auth"]
+# )
+# def create_password(
+#     create_password_request: CreatePasswordRequest, db: Session = Depends(get_db)
+# ):
+#     email = create_password_request.email
+#     master_password = create_password_request.master_password
 
-    user_id, user_status, first_name, last_name = get_cognito_user(email)
+#     user_id, user_status, first_name, last_name = get_cognito_user(email)
 
-    crud.create_master_password(db=db, user_id=user_id, password_hash=master_password)
+#     crud.create_master_password(db=db, user_id=user_id, password_hash=master_password)
 
-    set_password_response = cognito_client.admin_set_user_password(
-        UserPoolId=USER_POOL_ID,
-        Username=email,
-        Password=master_password,
-        Permanent=True,
-    )
+#     set_password_response = cognito_client.admin_set_user_password(
+#         UserPoolId=USER_POOL_ID,
+#         Username=email,
+#         Password=master_password,
+#         Permanent=True,
+#     )
 
-    login_response = cognito_client.initiate_auth(
-        AuthFlow="USER_PASSWORD_AUTH",
-        ClientId=COGNITO_CLIENT_ID,
-        AuthParameters={
-            "USERNAME": email,
-            "PASSWORD": master_password,
-            "SECRET_HASH": get_secret_hash(
-                email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET
-            ),
-        },
-    )
-    vault = schemas.VaultCreate(name="default")
-    db_vault = crud.create_vault(db, vault, creator_id=user_id)
+#     login_response = cognito_client.initiate_auth(
+#         AuthFlow="USER_PASSWORD_AUTH",
+#         ClientId=COGNITO_CLIENT_ID,
+#         AuthParameters={
+#             "USERNAME": email,
+#             "PASSWORD": master_password,
+#             "SECRET_HASH": get_secret_hash(
+#                 email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET
+#             ),
+#         },
+#     )
+#     vault = schemas.VaultCreate(name="default")
+#     db_vault = crud.create_vault(db, vault, creator_id=user_id)
 
-    item = schemas.ItemCreate(
-        title="Keylance Master Password",
-        username=email,
-        password=master_password,
-        description="This is master password for your Keylance account",
-        type="PASSWORD",
-    )
-    crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
+#     item = schemas.ItemCreate(
+#         title="Keylance Master Password",
+#         username=email,
+#         password=master_password,
+#         description="This is master password for your Keylance account",
+#         type="PASSWORD",
+#     )
+#     crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
 
-    return {
-        "accessToken": login_response["AuthenticationResult"]["AccessToken"],
-        "idToken": login_response["AuthenticationResult"]["IdToken"],
-        "refreshToken": login_response["AuthenticationResult"]["RefreshToken"],
-    }
+#     return {
+#         "accessToken": login_response["AuthenticationResult"]["AccessToken"],
+#         "idToken": login_response["AuthenticationResult"]["IdToken"],
+#         "refreshToken": login_response["AuthenticationResult"]["RefreshToken"],
+#     }
 
 
 class LoginRequest(BaseModel):

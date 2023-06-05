@@ -8,6 +8,7 @@ class VaultBase(BaseModel):
     name: Optional[str] = None
     tags: Optional[List[str]] = None
     description: Optional[str] = None
+    is_default: Optional[bool] = False
 
 
 class VaultCreate(VaultBase):

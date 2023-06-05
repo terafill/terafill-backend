@@ -7,7 +7,10 @@ from .. import models, schemas, crud
 from ..utils.security import get_current_user
 from ..database import get_db
 
-router = APIRouter(tags=["user"])
+# async def get_user_id(user_id: str = Header()):
+#     return user_id
+
+router = APIRouter(dependencies=[], tags=["user"])
 
 
 @router.get("/users/me/", response_model=schemas.User, tags=["current_user"])
@@ -30,6 +33,8 @@ def update_user_me(
 # def delete_user_me(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
 #     return crud.delete_user(db=db, db_user=current_user)
 
+# async def get_user_id(user_id: str = Header()):
+#     return user_id
 
 @router.post("/users/me/vaults/", response_model=schemas.Vault, tags=["current_user"])
 def create_vault(
@@ -66,6 +71,30 @@ def read_vault(
         raise HTTPException(status_code=404, detail="Vault not found")
     return vault
 
+# @router.post(
+#     "/users/me/vaults/{vault_id}/share",
+#     status_code=status.HTTP_204_NO_CONTENT,
+#     tags=["current_user"]
+# )
+# def share_vault(
+#     vault_id: str,
+#     db: Session = Depends(get_db),
+#     current_user: models.User = Depends(get_current_user),
+# ):
+#     peer_user_data = crud.get_user_by_email()
+#     if not peer_user_data:
+#         user = schemas.UserCreate(
+#             id=user_id,
+#             email=email,
+#             first_name=first_name,
+#             last_name=last_name
+#         )
+#         crud.create_user(db, user)
+#     vault = crud.share_vault(db, vault_id=vault_id, peer_user_id=peer_user_id)
+#     if vault is None:
+#         raise HTTPException(status_code=404, detail="Vault not found")
+#     return vault
+
 
 @router.put(
     "/users/me/vaults/{vault_id}", response_model=schemas.Vault, tags=["current_user"]
@@ -95,6 +124,8 @@ def delete_vault(
     db_vault = crud.get_vault(db, vault_id=vault_id)
     if db_vault is None:
         raise HTTPException(status_code=404, detail="Vault not found")
+    elif db_vault.is_default:
+        raise HTTPException(status_code=400, detail="Default Vault cannot be delete")
     crud.delete_vault(db=db, db_vault=db_vault)
 
 

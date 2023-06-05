@@ -30,6 +30,7 @@ def create_vault(db: Session, vault: schemas.VaultCreate, creator_id: str):
         tags=vault.tags,
         creator_id=creator_id,
         id=vault_id,
+        is_default=vault.is_default,
     )
     db.add(db_vault)
     db.commit()

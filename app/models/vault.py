@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, ForeignKey, DateTime, JSON, Boolean
+# from sqlalchemy.orm import relationship
 
 from ..database import Base
 
@@ -14,6 +14,7 @@ class Vault(Base):
     creator_id = Column(String(128), ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     tags = Column(JSON, nullable=True)
+    is_default = Column(Boolean, default=False)
 
     # user = relationship("User", back_populates="vaults")
     # items = relationship("Item", back_populates="vault")
