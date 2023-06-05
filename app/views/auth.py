@@ -1,3 +1,4 @@
+import re
 import os
 import hmac
 import hashlib
@@ -84,6 +85,31 @@ def get_cognito_user(email):
     return user_id, user_status, first_name, last_name
 
 
+def is_strong_password(password: str) -> (bool, str):
+    """
+    Check if `password` is a strong password.
+
+    A strong password must:
+    - Be at least 8 characters long
+    - Include at least one uppercase letter
+    - Include at least one lowercase letter
+    - Include at least one digit
+    - Include at least one special character
+    """
+    if len(password) < 8:
+        return False, "Password should be at least 8 characters long."
+    if not re.search(r'[A-Z]', password):
+        return False, "Password should contain at least one uppercase letter."
+    if not re.search(r'[a-z]', password):
+        return False, "Password should contain at least one lowercase letter."
+    if not re.search(r'\d', password):
+        return False, "Password should contain at least one digit."
+    if not re.search(r'\W', password):
+        return False, "Password should contain at least one special character."
+
+    return True, "Password is strong."
+
+
 @router.post("/auth/signup/", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
 def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
     try:
@@ -97,6 +123,12 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
         """
         Signup with cognito required when user is new or need_sign_up
         """
+        password_strength = is_strong_password(password)
+        if not password_strength[0]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid password provided! {password_strength[1]}",
+            )
 
         user = crud.get_user_by_email(db, email)
         if not user:  # new user
@@ -143,7 +175,14 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Email is deactivated. Please contact support for resolution.",
             )
-
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "InvalidPasswordException":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid password provided, please try again.",
+            )
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error(f"Something went wrong {e}", exc_info=True)
         raise HTTPException(
@@ -216,68 +255,13 @@ def confirm_sign_up(
             type="PASSWORD",
         )
         crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
+        crud.create_master_password(db=db, user_id=user_id, password_hash=password)
 
         return {
             "accessToken": login_response["AuthenticationResult"]["AccessToken"],
             "idToken": login_response["AuthenticationResult"]["IdToken"],
             "refreshToken": login_response["AuthenticationResult"]["RefreshToken"],
         }
-
-
-class CreatePasswordRequest(BaseModel):
-    email: str
-    master_password: str
-
-
-# @router.post(
-#     "/auth/create-password/", status_code=status.HTTP_201_CREATED, tags=["auth"]
-# )
-# def create_password(
-#     create_password_request: CreatePasswordRequest, db: Session = Depends(get_db)
-# ):
-#     email = create_password_request.email
-#     master_password = create_password_request.master_password
-
-#     user_id, user_status, first_name, last_name = get_cognito_user(email)
-
-#     crud.create_master_password(db=db, user_id=user_id, password_hash=master_password)
-
-#     set_password_response = cognito_client.admin_set_user_password(
-#         UserPoolId=USER_POOL_ID,
-#         Username=email,
-#         Password=master_password,
-#         Permanent=True,
-#     )
-
-#     login_response = cognito_client.initiate_auth(
-#         AuthFlow="USER_PASSWORD_AUTH",
-#         ClientId=COGNITO_CLIENT_ID,
-#         AuthParameters={
-#             "USERNAME": email,
-#             "PASSWORD": master_password,
-#             "SECRET_HASH": get_secret_hash(
-#                 email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET
-#             ),
-#         },
-#     )
-#     vault = schemas.VaultCreate(name="default")
-#     db_vault = crud.create_vault(db, vault, creator_id=user_id)
-
-#     item = schemas.ItemCreate(
-#         title="Keylance Master Password",
-#         username=email,
-#         password=master_password,
-#         description="This is master password for your Keylance account",
-#         type="PASSWORD",
-#     )
-#     crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
-
-#     return {
-#         "accessToken": login_response["AuthenticationResult"]["AccessToken"],
-#         "idToken": login_response["AuthenticationResult"]["IdToken"],
-#         "refreshToken": login_response["AuthenticationResult"]["RefreshToken"],
-#     }
-
 
 class LoginRequest(BaseModel):
     email: str
