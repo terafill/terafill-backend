@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 
 from database import Base
 
+
 class PasswordHistory(Base):
     __tablename__ = "password_history"
     id = Column(Integer, primary_key=True, index=True)

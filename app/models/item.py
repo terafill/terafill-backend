@@ -6,6 +6,7 @@ from sqlalchemy.orm import relationship
 
 from ..database import Base
 
+
 class ItemType(str, PyEnum):
     PASSWORD = "PASSWORD"
     NOTE = "NOTE"
@@ -16,6 +17,7 @@ class ItemType(str, PyEnum):
     WIFI_PASSWORD = "WIFI_PASSWORD"
     DATABASE_CREDENTIAL = "DATABASE_CREDENTIAL"
     DOCUMENT = "DOCUMENT"
+
 
 class Item(Base):
     __tablename__ = "items"

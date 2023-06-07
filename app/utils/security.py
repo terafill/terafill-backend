@@ -1,8 +1,9 @@
 import os
 import json
+import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status, Security
-from fastapi.security import OAuth2PasswordBearer, HTTPBearer
+from fastapi import Depends, HTTPException, status, Security, Request
+from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 import jwt
 import requests
@@ -15,11 +16,13 @@ from ..database import db
 def get_db():
     yield db
 
-AWS_REGION_NAME = os.environ['AWS_REGION_NAME']
+
+AWS_REGION_NAME = os.environ["AWS_REGION_NAME"]
 USER_POOL_ID = os.environ["USER_POOL_ID"]
 
 
 security_scheme = HTTPBearer()
+
 
 def get_keys():
     # Get the public keys from Amazon Cognito
@@ -31,14 +34,25 @@ def get_keys():
     keys = response.json()["keys"]
     return keys
 
+
 # Dependency to extract the JWT access token from the HTTP request
 async def get_token(token: str = Security(security_scheme)):
     if hasattr(token, "credentials"):
         return token.credentials
     return {}
 
+# async def get_user_id(user_id: str = Header()):
+#     return user_id
+
+
 # Dependency to get the current user from the JWT access token
-async def get_current_user(db: Session = Depends(get_db), token: str = Depends(get_token)):
+async def get_current_user(
+    request: Request,
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+    # user_id: str = Depends(get_user_id),
+):
+    # user_id = request.headers.get('user-id')
 
     # Check if the token was provided
     if not token:
@@ -48,6 +62,7 @@ async def get_current_user(db: Session = Depends(get_db), token: str = Depends(g
     try:
         header = jwt.get_unverified_header(token)
         payload = jwt.decode(token, options={"verify_signature": False})
+        logging.debug("jwt payload", payload)
         keys = get_keys()
 
         kid = header["kid"]
@@ -61,22 +76,36 @@ async def get_current_user(db: Session = Depends(get_db), token: str = Depends(g
             public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(key))
             decoded_token = jwt.decode(token, public_key, algorithms=["RS256"])
         else:
-            raise HTTPException(status_code=401, detail="Unable to find key to verify access token signature")
+            raise HTTPException(
+                status_code=401,
+                detail="Unable to find key to verify access token signature",
+            )
     except Exception as e:
         print(e)
         raise HTTPException(status_code=401, detail="Access token invalid")
 
     try:
-        print("USER_ID", decoded_token["sub"])
+        sub = decoded_token["sub"]
+        print("USER sub", sub)
         # Return a User object with the user's data
-        db_user = crud.get_user(db, user_id=decoded_token["sub"])
+        db_user = crud.get_user_by_sub(db, sub=sub)
         if db_user is None:
+            print("db_user", db_user)
             raise HTTPException(status_code=404, detail="User not found")
+        elif db_user.status != "confirmed":
+            raise HTTPException(
+                status_code=401,
+                detail="User is either not confirmed or deactivated. Please contact support.")
+
+        print("USER user_id", db_user.id)
 
         return db_user
-    except JWTError:
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Invalid authentication credentials: {e}", exc_info=True)
         # Raise an HTTPException if the token is invalid
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
+            detail=f"Invalid authentication credentials: {e}",
         )
