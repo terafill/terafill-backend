@@ -5,9 +5,8 @@ from sqlalchemy.orm import sessionmaker
 from .config import DATABASE_URL
 
 
-engine = create_engine(
-    DATABASE_URL
-)
+engine = create_engine(DATABASE_URL)
+
 
 # Dependency
 def get_db():
@@ -17,6 +16,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

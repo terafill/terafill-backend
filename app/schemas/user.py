@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr, UUID4
 
+
 class Gender(str, Enum):
     male = "male"
     female = "female"
@@ -29,16 +30,22 @@ class UserBase(BaseModel):
     last_name: Optional[str] = None
     birthday: Optional[date] = None
     gender: Optional[Gender] = None
+    status: Optional[str] = None
+    sub: Optional[str] = None
+
 
 class UserCreate(UserBase):
-    id: UUID4
     email: EmailStr
     first_name: str
+    status: str
+
 
 class UserUpdate(UserBase):
     pass
 
+
 class User(UserBase):
+    id: UUID4
     created_at: datetime
 
     class Config:

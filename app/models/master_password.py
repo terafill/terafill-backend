@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, DateTime, ForeignKey
 
 from ..database import Base
+
 
 class MasterPassword(Base):
     __tablename__ = "master_passwords"
