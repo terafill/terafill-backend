@@ -8,6 +8,10 @@ from sqlalchemy.orm import Session
 import jwt
 import requests
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from authlib.jose import JsonWebEncryption
+
 from .. import crud
 from ..database import db
 
@@ -109,3 +113,57 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid authentication credentials: {e}",
         )
+
+
+def get_session_private_key():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+
+    # Serialize the private key in PEM format
+    private_key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    session_private_key = private_key_pem.decode()
+
+    return session_private_key
+
+
+def get_session_public_key(session_private_key):
+    # Load the private key from the data
+    private_key = serialization.load_pem_private_key(
+        session_private_key.encode(),
+        password=None  # Replace with the password if the private key is encrypted
+    )
+
+    # Extract the public key from the private key
+    public_key = private_key.public_key()
+
+    # Serialize the public key in PEM format
+    public_key_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    session_public_key = public_key_pem.decode()
+
+    return session_public_key
+
+
+def get_session_token(user_id, session_id, client_id, session_private_key):
+    jwe = JsonWebEncryption()
+    protected = {'alg': 'RSA-OAEP-256', 'enc': 'A256GCM'}
+    payload = json.dumps({
+        "userId": user_id,
+        "sessionId": session_id,
+        "clientId": client_id,
+        "tier": "pro",
+    })
+
+    session_public_key = get_session_public_key(session_private_key)
+    session_token = jwe.serialize_compact(protected, payload, session_public_key)
+    return session_token.decode()
