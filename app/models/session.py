@@ -13,6 +13,7 @@ class Session(Base):
     session_private_key = Column(Text)
     session_token = Column(Text)
     client_id = Column(String(128))
+    platform_client_id = Column(String(128))
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expiry_at = Column(DateTime, nullable=False)

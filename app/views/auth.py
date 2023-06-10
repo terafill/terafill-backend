@@ -5,18 +5,19 @@ import random
 import hashlib
 import base64
 import logging
-
+from typing import Annotated, Union
+from datetime import datetime
 
 import boto3
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Response, Cookie
 
 
 from .. import schemas, crud
 from ..database import get_db
-from ..utils.security import get_session_private_key, get_session_token
+from ..utils.security import get_session_private_key, get_session_token, get_session_details
 
 
 router = APIRouter()
@@ -84,7 +85,7 @@ def send_verification_code(email, verification_code):
             },
             Source=sender,
         )
-        print(response)
+        # print(response)
 
     except ClientError as e:
         print(e.response['Error']['Message'])
@@ -145,17 +146,66 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
         )
 
 
+def build_session(
+    db,
+    user_id,
+    client_id,
+    platform_client_id=None,
+    csdek=None,
+    session_private_key=None
+):
+
+    session_id = str(uuid.uuid4())
+
+    if platform_client_id is None:
+        platform_client_id = str(uuid.uuid4())
+
+    if csdek is None:
+        csdek = str(uuid.uuid4())
+
+    if session_private_key is None:
+        session_private_key = get_session_private_key()
+
+    session_token = get_session_token(
+        user_id,
+        session_id,
+        client_id,
+        platform_client_id,
+        csdek,
+        session_private_key)
+
+    # Update user status and profile data
+    session = schemas.SessionCreate(
+        id=session_id,
+        user_id=user_id,
+        csdek=csdek,
+        session_private_key=session_private_key,
+        session_token=session_token,
+        client_id=client_id,
+        platform_client_id=platform_client_id,
+    )
+    crud.create_session(db=db, session=session)
+
+    return {
+        "sessionId": session_id,
+        "csdek": csdek,
+        "sessionToken": session_token,
+        "platformClientId": platform_client_id,
+    }
+
+
 # Endpoint for verifying email code
 @router.post(
     "/auth/signup/confirm/", status_code=status.HTTP_200_OK, tags=["auth"]
 )
 def confirm_sign_up(
+    response: Response,
     signup_confirmation_request: SignupConfirmationRequest,
     db: Session = Depends(get_db),
-    client_id: str = Header(),
+    client_id: Annotated[Union[str, None], Header()] = None,
+    platform_client_id: Annotated[Union[str, None], Cookie()] = None
 ):
     try:
-
         email = signup_confirmation_request.email
         verification_code = signup_confirmation_request.verification_code
         mpesk = signup_confirmation_request.mpesk
@@ -202,117 +252,307 @@ def confirm_sign_up(
         # )
         # crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
 
-        session_id = str(uuid.uuid4())
-        csdek = str(uuid.uuid4())
-        session_private_key = get_session_private_key()
-        session_token = get_session_token(user_id, session_id, client_id, session_private_key)
+        session_details = build_session(db, user_id, client_id, platform_client_id)
 
-        # Update user status and profile data
-        session = schemas.SessionCreate(
-            id=session_id,
-            user_id=user_id,
-            csdek=csdek,
-            session_private_key=session_private_key,
-            session_token=session_token,
-            client_id=client_id
+        # Set cookies with httpOnly flag set to true
+        response.set_cookie(
+            key="sessionId",
+            value=session_details["sessionId"],
+            httponly=True,
+            max_age=7 * 24 * 60 * 60,
+            secure=False,
+            samesite="lax"
         )
-        crud.create_session(db=db, session=session)
+        response.set_cookie(
+            key="sessionToken",
+            value=session_details["sessionToken"],
+            httponly=True,
+            max_age=7 * 24 * 60 * 60,
+            secure=False,
+            samesite="lax"
+        )
 
+        response.set_cookie(
+            key="userId",
+            value=user_id,
+            httponly=False,
+            max_age=7 * 24 * 60 * 60,
+            secure=False,
+            samesite="lax"
+        )
+
+        response.set_cookie(
+            key="platformClientId",
+            value=session_details["platformClientId"],
+            httponly=True,
+            max_age=7 * 24 * 60 * 60,
+            secure=False,
+            samesite="lax"
+        )
         return {
-            "sessionId": session_id,
-            "sessionToken": session_token,
-            "userId": user_id,
-            "csdek": csdek,
+            "csdek": session_details["csdek"]
         }
 
 
 class LoginRequest(BaseModel):
     email: str
-    master_password: str
+    mpesk: str
 
 
 @router.post("/auth/login/", status_code=status.HTTP_200_OK, tags=["auth"])
-def login(login_request: LoginRequest):
+def login(
+    response: Response,
+    login_request: LoginRequest,
+    db: Session = Depends(get_db),
+    client_id: str = Header(),
+    platform_client_id: Annotated[Union[str, None], Cookie()] = None
+):
     try:
         email = login_request.email
-        master_password = login_request.master_password
+        mpesk = login_request.mpesk
 
-        login_response = cognito_client.initiate_auth(
-            AuthFlow="USER_PASSWORD_AUTH",
-            ClientId=COGNITO_CLIENT_ID,
-            AuthParameters={
-                "USERNAME": email,
-                "PASSWORD": master_password,
-                "SECRET_HASH": get_secret_hash(
-                    email, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET
-                ),
-            },
-        )
+        # Get user details
+        db_user = crud.get_user_by_email(db, email)
+        if db_user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+        user_id = db_user.id
 
-        return {
-            "accessToken": login_response["AuthenticationResult"]["AccessToken"],
-            "idToken": login_response["AuthenticationResult"]["IdToken"],
-            "refreshToken": login_response["AuthenticationResult"]["RefreshToken"],
-        }
-    except ClientError as e:
-        if e.response["Error"]["Code"] == "NotAuthorizedException":
+        # Get user credentials
+        db_mpesk = crud.get_mpesk(db, user_id)
+        if db_mpesk.mpesk != mpesk:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Incorrect username or password.",
             )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Something went wrong: {e}",
-            )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong: {e}"
+
+        # expire active sessions
+        crud.expire_active_sessions(db, user_id, client_id, platform_client_id)
+
+        # generate session
+        session_details = build_session(db, user_id, client_id, platform_client_id)
+
+        # Set cookies with httpOnly flag set to true
+        response.set_cookie(
+            key="sessionId",
+            value=session_details["sessionId"],
+            httponly=True,
+            max_age=7 * 24 * 60 * 60,
+            secure=False,
+            samesite="lax"
+        )
+        response.set_cookie(
+            key="sessionToken",
+            value=session_details["sessionToken"],
+            httponly=True,
+            max_age=7 * 24 * 60 * 60,
+            secure=False,
+            samesite="lax"
         )
 
+        response.set_cookie(
+            key="userId",
+            value=user_id,
+            httponly=False,
+            max_age=7 * 24 * 60 * 60,
+            secure=False,
+            samesite="lax"
+        )
 
-class LogoutRequest(BaseModel):
-    access_token: str
+        response.set_cookie(
+            key="platformClientId",
+            value=session_details["platformClientId"],
+            httponly=True,
+            max_age=7 * 24 * 60 * 60,
+            secure=False,
+            samesite="lax"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Something went wrong: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong."
+        )
+    else:
+        return {
+            "csdek": session_details["csdek"]
+        }
 
 
 @router.post("/auth/logout/", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
-def logout(logout_request: LogoutRequest):
-    response = cognito_client.global_sign_out(AccessToken=logout_request.access_token)
+def logout(
+    response: Response,
+    db: Session = Depends(get_db),
+    sessionId: str = Cookie(),
+    userId: str = Cookie(),
+    sessionToken: str = Cookie(),
+):
+    try:
+        user_id = userId
+        session_id = sessionId
+        session_token = sessionToken
 
+        db_session = crud.get_session(db, user_id, session_id)
 
-class LoginRefreshRequest(BaseModel):
-    refresh_token: str
-    username: str
+        if db_session:
+            session_details = get_session_details(session_token, db_session.session_private_key)
+            if session_details["sessionId"] != session_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid Session token.",
+                )
+
+            # expire active sessions which belong to specific browser/device
+            crud.expire_active_sessions(
+                db,
+                user_id=session_details["userId"],
+                client_id=session_details["clientId"],
+                platform_client_id=session_details["platformClientId"]
+            )
+
+            response.delete_cookie("sessionToken")
+            response.delete_cookie("sessionId")
+            response.delete_cookie("userId")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Something went wrong: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Something went wrong.",
+        )
 
 
 @router.post("/auth/login/refresh", status_code=status.HTTP_200_OK, tags=["auth"])
-def login_refresh(login_refresh_request: LoginRefreshRequest):
-    refresh_token = login_refresh_request.refresh_token
-    username = login_refresh_request.username
+def login_refresh(
+    login_request: LoginRequest,
+    db: Session = Depends(get_db),
+    session_id: str = Header(),
+    user_id: str = Header(),
+    session_token: str = Header()
+):
+    try:
 
-    response = cognito_client.initiate_auth(
-        ClientId="3168rpn2rk5pmb4hcgahn9pk6m",
-        AuthFlow="REFRESH_TOKEN_AUTH",
-        AuthParameters={
-            "REFRESH_TOKEN": login_refresh_request.refresh_token,
-            "SECRET_HASH": get_secret_hash(
-                username, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET
-            ),
-        },
-    )
+        email = login_request.email
+        mpesk = login_request.mpesk
 
-    return {
-        "accessToken": response["AuthenticationResult"]["AccessToken"],
-        "idToken": response["AuthenticationResult"]["IdToken"],
-    }
+        # Get user details
+        db_user = crud.get_user_by_email(db, email)
+        if db_user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+        user_id = db_user.id
+
+        # Get user credentials
+        db_mpesk = crud.get_mpesk(db, user_id)
+        if db_mpesk.mpesk != mpesk:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect username or password.",
+            )
+
+        db_session = crud.get_session(db, user_id, session_id)
+
+        if db_session:
+            session_details = get_session_details(session_token, db_session.session_private_key)
+            if session_details["sessionId"] != session_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid Session token.",
+                )
+
+            # expire active sessions
+            crud.expire_active_sessions(
+                db,
+                user_id=session_details["userId"],
+                client_id=session_details["clientId"],
+                platform_client_id=session_details["platformClientId"]
+            )
+
+            # generate session
+            new_session_details = build_session(
+                db,
+                session_details["userId"],
+                session_details["clientId"],
+                session_details["platformClientId"],
+                csdek=session_details["csdek"],
+                session_private_key=db_session.session_private_key
+            )
+
+            return {
+                "userId": user_id,
+                "sessionId": new_session_details["sessionId"],
+                "sessionToken": new_session_details["sessionToken"],
+                "csdek": new_session_details["csdek"],
+                "platformClientId": new_session_details["platformClientId"]
+            }
+
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session doesn't exists.",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Something went wrong: {e}", exc_info=True)
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Something went wrong.",
+        )
 
 
 @router.get("/auth/status", status_code=status.HTTP_200_OK, tags=["auth"])
-async def auth_status(token: str):
+async def auth_status(
+    response: Response,
+    db: Session = Depends(get_db),
+    userId: str = Cookie(),
+    sessionId: str = Cookie(),
+    sessionToken: str = Cookie()
+):
     try:
-        response = cognito_client.get_user(
-            AccessToken=token,
+        user_id = userId
+        session_id = sessionId
+        session_token = sessionToken
+        db_session = crud.get_session(db, user_id, session_id)
+
+        if db_session:
+            session_details = get_session_details(session_token, db_session.session_private_key)
+            if session_details["sessionId"] != session_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid Session token.",
+                )
+
+            if datetime.utcnow() > db_session.expiry_at:
+                # expire active sessions which belong to specific browser/device
+                crud.expire_active_sessions(
+                    db,
+                    user_id=session_details["userId"],
+                    client_id=session_details["clientId"],
+                    platform_client_id=session_details["platformClientId"]
+                )
+
+                response.delete_cookie("sessionToken")
+                response.delete_cookie("sessionId")
+                response.delete_cookie("userId")
+                return {"loggedIn": False}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Something went wrong: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Something went wrong.",
         )
-        return {"logged_in": True}
-    except:
-        return {"logged_in": False}
+    else:
+        return {"loggedIn": True}

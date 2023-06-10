@@ -5,12 +5,15 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 
 
-def get_session(db: Session, user_id: str, session_id: str, client_id: str):
+def get_session(
+    db: Session,
+    user_id: str,
+    session_id: str
+):
     return (
         db.query(models.Session)
         .filter(models.Session.user_id == user_id)
         .filter(models.Session.id == session_id)
-        .filter(models.Session.client_id == client_id)
         .first()
     )
 
@@ -25,6 +28,7 @@ def create_session(db: Session, session: schemas.Session):
         session_private_key=session.session_private_key,
         session_token=session.session_token,
         client_id=session.client_id,
+        platform_client_id=session.platform_client_id,
         created_at=created_at,
         expiry_at=expiry_at,
     )
@@ -33,6 +37,15 @@ def create_session(db: Session, session: schemas.Session):
     db.refresh(db_session)
     return db_session
 
+
+def expire_active_sessions(db: Session, user_id: str, client_id: str, platform_client_id: str):
+    # Delete all sessions that match the given criteria
+    db.query(models.Session).filter(
+        models.Session.user_id == user_id,
+        models.Session.client_id == client_id,
+        models.Session.platform_client_id == platform_client_id
+    ).delete()
+    db.commit()
 
 # def update_master_password(
 #     db: Session,

@@ -8,6 +8,7 @@ class SessionBase(BaseModel):
     csdek: UUID4
     user_id: UUID4
     client_id: UUID4
+    platform_client_id: UUID4
     id: UUID4
 
 

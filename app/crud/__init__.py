@@ -41,4 +41,5 @@ from .mpesk import (
 from .session import (
     get_session,
     create_session,
+    expire_active_sessions,
 )
