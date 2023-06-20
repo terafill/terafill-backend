@@ -1,12 +1,14 @@
-import os
 import json
 import logging
+from datetime import datetime
+from typing import Annotated, Union
 
-from fastapi import Depends, HTTPException, status, Security, Request
-from fastapi.security import HTTPBearer
+from fastapi import Depends, HTTPException, status, Request, Cookie
 from sqlalchemy.orm import Session
-import jwt
-import requests
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from authlib.jose import JsonWebEncryption
 
 from .. import crud
 from ..database import db
@@ -17,95 +19,133 @@ def get_db():
     yield db
 
 
-AWS_REGION_NAME = os.environ["AWS_REGION_NAME"]
-USER_POOL_ID = os.environ["USER_POOL_ID"]
-
-
-security_scheme = HTTPBearer()
-
-
-def get_keys():
-    # Get the public keys from Amazon Cognito
-    url = "https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/jwks.json".format(
-        region=AWS_REGION_NAME,
-        user_pool_id=USER_POOL_ID,
+def get_session_private_key():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
     )
-    response = requests.get(url)
-    keys = response.json()["keys"]
-    return keys
+
+    # Serialize the private key in PEM format
+    private_key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    session_private_key = private_key_pem.decode()
+
+    return session_private_key
 
 
-# Dependency to extract the JWT access token from the HTTP request
-async def get_token(token: str = Security(security_scheme)):
-    if hasattr(token, "credentials"):
-        return token.credentials
-    return {}
+def get_session_public_key(session_private_key):
+    # Load the private key from the data
+    private_key = serialization.load_pem_private_key(
+        session_private_key.encode(),
+        password=None  # Replace with the password if the private key is encrypted
+    )
 
-# async def get_user_id(user_id: str = Header()):
-#     return user_id
+    # Extract the public key from the private key
+    public_key = private_key.public_key()
+
+    # Serialize the public key in PEM format
+    public_key_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    session_public_key = public_key_pem.decode()
+
+    return session_public_key
+
+
+def get_session_token(
+    user_id,
+    session_id,
+    client_id,
+    platform_client_id,
+    csdek,
+    session_private_key
+):
+    jwe = JsonWebEncryption()
+    protected = {'alg': 'RSA-OAEP-256', 'enc': 'A256GCM'}
+    payload = json.dumps({
+        "userId": user_id,
+        "sessionId": session_id,
+        "clientId": client_id,
+        "platformClientId": platform_client_id,
+        "csdek": csdek,
+        "tier": "pro",
+    })
+
+    session_public_key = get_session_public_key(session_private_key)
+    session_token = jwe.serialize_compact(protected, payload, session_public_key)
+    return session_token.decode()
+
+
+def get_session_details(session_token, session_private_key):
+    jwe = JsonWebEncryption()
+    data = jwe.deserialize_compact(session_token, session_private_key)
+    session_details = json.loads(data["payload"].decode())
+    return session_details
 
 
 # Dependency to get the current user from the JWT access token
 async def get_current_user(
     request: Request,
     db: Session = Depends(get_db),
-    token: str = Depends(get_token),
-    # user_id: str = Depends(get_user_id),
+    userId: Annotated[Union[str, None], Cookie()] = None,
+    sessionId: Annotated[Union[str, None], Cookie()] = None,
+    sessionToken: Annotated[Union[str, None], Cookie()] = None,
 ):
-    # user_id = request.headers.get('user-id')
+    user_id = userId
+    session_id = sessionId
+    session_token = sessionToken
 
-    # Check if the token was provided
-    if not token:
-        raise HTTPException(status_code=401, detail="Access token missing")
+    # Check if the user-id was provided
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User Id missing")
 
-    # Decode the JWT token
+    # Check if the session-id was provided
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Session Id missing")
+
+    # Check if the session token was provided
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Session token missing")
+
+    # Decode the JWE token
     try:
-        header = jwt.get_unverified_header(token)
-        payload = jwt.decode(token, options={"verify_signature": False})
-        logging.debug("jwt payload", payload)
-        keys = get_keys()
+        db_session = crud.get_session(db, user_id, session_id)
 
-        kid = header["kid"]
-        key = None
-        for k in keys:
-            if k["kid"] == kid:
-                key = k
-                break
-        # Verify the signature of the access token using the key
-        if key:
-            public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(key))
-            decoded_token = jwt.decode(token, public_key, algorithms=["RS256"])
-        else:
-            raise HTTPException(
-                status_code=401,
-                detail="Unable to find key to verify access token signature",
-            )
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=401, detail="Access token invalid")
+        if db_session:
+            session_details = get_session_details(session_token, db_session.session_private_key)
+            if session_details["sessionId"] != session_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid Session token.",
+                )
 
-    try:
-        sub = decoded_token["sub"]
-        print("USER sub", sub)
-        # Return a User object with the user's data
-        db_user = crud.get_user_by_sub(db, sub=sub)
-        if db_user is None:
-            print("db_user", db_user)
-            raise HTTPException(status_code=404, detail="User not found")
-        elif db_user.status != "confirmed":
-            raise HTTPException(
-                status_code=401,
-                detail="User is either not confirmed or deactivated. Please contact support.")
-
-        print("USER user_id", db_user.id)
-
-        return db_user
+            if datetime.utcnow() > db_session.expiry_at:
+                # expire active sessions which belong to specific browser/device
+                crud.expire_active_sessions(
+                    db,
+                    user_id=session_details["userId"],
+                    client_id=session_details["clientId"],
+                    platform_client_id=session_details["platformClientId"]
+                )
+                raise HTTPException(
+                    status_code=401,
+                    detail="Session token is invalid. Token has expired."
+                )
     except HTTPException:
         raise
     except Exception as e:
         logging.error(f"Invalid authentication credentials: {e}", exc_info=True)
+
         # Raise an HTTPException if the token is invalid
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid authentication credentials: {e}",
-        )
+            detail=f"Invalid authentication credentials: {e}")
+
+    else:
+        return crud.get_user(db, user_id=user_id)

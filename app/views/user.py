@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Annotated, Union
+from fastapi import APIRouter, Depends, HTTPException, status, Cookie
 from sqlalchemy.orm import Session
 
 # from ..database import SessionLocal, engine
@@ -7,8 +7,6 @@ from .. import models, schemas, crud
 from ..utils.security import get_current_user
 from ..database import get_db
 
-# async def get_user_id(user_id: str = Header()):
-#     return user_id
 
 router = APIRouter(dependencies=[], tags=["user"])
 
