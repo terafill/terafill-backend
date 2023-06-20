@@ -31,12 +31,11 @@ class UserBase(BaseModel):
     birthday: Optional[date] = None
     gender: Optional[Gender] = None
     status: Optional[str] = None
-    sub: Optional[str] = None
+    email_verification_code: Optional[str] = None
 
 
 class UserCreate(UserBase):
     email: EmailStr
-    first_name: str
     status: str
 
 

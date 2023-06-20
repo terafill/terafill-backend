@@ -36,7 +36,7 @@ class Status(str, PyEnum):
 class User(Base):
     __tablename__ = "users"
     id = Column(String(128), primary_key=True, index=True)
-    sub = Column(String(128))
+    email_verification_code = Column(Integer)
     email = Column(String(255), unique=True, index=True)
     secondary_email = Column(String(255))
     phone_no = Column(String(15))
