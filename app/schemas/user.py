@@ -40,7 +40,14 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(UserBase):
-    pass
+    profile_image: Optional[bytes] = None
+
+
+class UserProfileImage(UserBase):
+    profile_image: Optional[bytes] = None
+
+    class Config:
+        orm_mode = True
 
 
 class User(UserBase):
