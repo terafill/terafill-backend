@@ -6,6 +6,7 @@ from .user import (
     get_user_by_sub,
     update_user,
     delete_user,
+    get_user_profile_image,
 )
 
 from .vault import (

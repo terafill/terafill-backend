@@ -101,6 +101,8 @@ async def get_current_user(
     session_id = sessionId
     session_token = sessionToken
 
+    # db.expire_all()
+
     # Check if the user-id was provided
     if not user_id:
         raise HTTPException(status_code=401, detail="User Id missing")

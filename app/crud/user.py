@@ -6,7 +6,13 @@ from .. import models, schemas
 
 
 def get_user(db: Session, user_id: str):
-    return db.query(models.User).filter(models.User.id == user_id).first()
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    return db_user
+
+
+def get_user_profile_image(db: Session, user_id: str):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    return db_user.profile_image
 
 
 def get_user_by_email(db: Session, email: str):
@@ -45,8 +51,6 @@ def update_user(db: Session, db_user: schemas.User, user: schemas.UserUpdate):
     for field, value in user.dict(exclude_unset=True).items():
         setattr(db_user, field, value)
     db.commit()
-    db.refresh(db_user)
-    return db_user
 
 
 def delete_user(db: Session, db_user: schemas.User):

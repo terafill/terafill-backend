@@ -1,5 +1,7 @@
+import base64
 from typing import List, Annotated, Union
-from fastapi import APIRouter, Depends, HTTPException, status, Cookie
+
+from fastapi import APIRouter, Depends, HTTPException, status, Cookie, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 # from ..database import SessionLocal, engine
@@ -15,16 +17,49 @@ router = APIRouter(dependencies=[], tags=["user"])
 def read_user_me(
     current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    return current_user
+    db_user = crud.get_user(db, user_id=current_user.id)
+    return db_user
 
 
-@router.put("/users/me/", response_model=schemas.User, tags=["current_user"])
-def update_user_me(
-    user: schemas.UserUpdate,
+@router.get("/users/me/profile-image/", response_model=schemas.UserProfileImage, tags=["current_user"])
+def read_user_profile_image(
+    current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    image_binary_data = crud.get_user_profile_image(db, user_id=current_user.id)
+    if image_binary_data:
+        image_base64 = base64.b64encode(image_binary_data).decode('utf-8')
+    else:
+        image_base64 = None
+
+    user = schemas.UserProfileImage(profile_image=image_base64)
+    return user
+
+
+@router.put("/users/me/", status_code=status.HTTP_204_NO_CONTENT, tags=["current_user"])
+async def update_user_me(
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    phone_no: str = Form(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    file: UploadFile = File(None),
 ):
-    return crud.update_user(db=db, db_user=current_user, user=user)
+    # Create UserUpdate schema
+    user_update = schemas.UserUpdate(
+        first_name=first_name,
+        last_name=last_name,
+        phone_no=phone_no
+    )
+
+    # Read the file
+    file_contents = None
+    if file:
+        file_contents = await file.read()
+        user_update.profile_image=file_contents
+
+
+    db_user = crud.get_user(db, user_id=current_user.id)
+    crud.update_user(db=db, db_user=db_user, user=user_update)
 
 
 # @router.delete("/users/me/", status_code=status.HTTP_204_NO_CONTENT, tags=["user"])

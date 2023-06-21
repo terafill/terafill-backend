@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, Integer, String, Date, DateTime, Enum
+from sqlalchemy import Column, Integer, String, Date, DateTime, Enum, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -46,6 +46,7 @@ class User(Base):
     gender = Column(Enum(Gender, name="gender"))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     status = Column(Enum(Status, name="status"), nullable=False)
+    profile_image = Column(LargeBinary)
 
     # master_password = relationship("MasterPassword", back_populates="user")
     # vaults = relationship("Vault", back_populates="user")
