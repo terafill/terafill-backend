@@ -43,4 +43,15 @@ from .session import (
     get_session,
     create_session,
     expire_active_sessions,
+    update_session,
+)
+
+from .srp_data import (
+    get_srp_data,
+    create_srp_data,
+)
+
+from .key_wrapping_key import (
+    get_key_wrapping_key,
+    create_key_wrapping_key,
 )
