@@ -297,6 +297,45 @@ def build_session(
         "platformClientId": platform_client_id,
     }
 
+class SaltRequest(BaseModel):
+    email: EmailStr
+
+@router.post("/auth/salt/", status_code=status.HTTP_200_OK, tags=["auth"])
+def get_salt(
+    response: Response,
+    login_request: SaltRequest,
+    db: Session = Depends(get_db),
+    client_id: str = Header(),
+    platform_client_id: Annotated[Union[str, None], Cookie()] = None
+):
+    try:
+        email = login_request.email
+
+        # Get user details
+        db_user = crud.get_user_by_email(db, email)
+        if db_user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+        user_id = db_user.id
+
+        db_srp_data = crud.get_srp_data(db, user_id)
+
+        salt = db_srp_data.salt
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Something went wrong: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong."
+        )
+    else:
+        return {
+            "salt": salt
+        }
+
 class LoginRequest(BaseModel):
     email: EmailStr
     client_public_key: str
@@ -459,6 +498,9 @@ def login_confirm(
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong."
         )
     else:
+
+        key_wrapping_key = crud.get_key_wrapping_key(db, user_id=user_id).encrypted_private_key
+
         # expire active sessions
         crud.expire_active_sessions(db, user_id, client_id, platform_client_id, session_id)
 
@@ -479,6 +521,7 @@ def login_confirm(
         )
         return {
             "server_proof": server_key_proof,
+            "key_wrapping_key": key_wrapping_key,
         }
 
 
@@ -510,7 +553,8 @@ def logout(
                 db,
                 user_id=session_details["userId"],
                 client_id=session_details["clientId"],
-                platform_client_id=session_details["platformClientId"]
+                platform_client_id=session_details["platformClientId"],
+                session_id=session_id,
             )
 
             response.delete_cookie("sessionToken")
@@ -637,7 +681,8 @@ async def auth_status(
                     db,
                     user_id=session_details["userId"],
                     client_id=session_details["clientId"],
-                    platform_client_id=session_details["platformClientId"]
+                    platform_client_id=session_details["platformClientId"],
+                    session_id=session_id,
                 )
 
                 response.delete_cookie("sessionToken")

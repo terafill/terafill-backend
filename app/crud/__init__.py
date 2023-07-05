@@ -23,7 +23,9 @@ from .item import (
     get_items,
     create_item,
     update_item,
-    delete_item
+    delete_item,
+    get_item_full,
+    get_items_full,
 )
 
 from .master_password import (
@@ -54,4 +56,9 @@ from .srp_data import (
 from .key_wrapping_key import (
     get_key_wrapping_key,
     create_key_wrapping_key,
+)
+
+from .encryption_key import (
+    get_encryption_key,
+    create_encryption_key,
 )

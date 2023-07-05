@@ -25,6 +25,7 @@ class ItemBase(BaseModel):
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
     type: Optional[ItemType] = None
+    encrypted_encryption_key: Optional[str] = None
 
 
 class ItemCreate(ItemBase):

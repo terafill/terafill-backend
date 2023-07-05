@@ -130,7 +130,8 @@ async def get_current_user(
                     db,
                     user_id=session_details["userId"],
                     client_id=session_details["clientId"],
-                    platform_client_id=session_details["platformClientId"]
+                    platform_client_id=session_details["platformClientId"],
+                    session_id=session_id
                 )
                 raise HTTPException(
                     status_code=401,

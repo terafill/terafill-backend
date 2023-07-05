@@ -173,9 +173,12 @@ def create_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    return crud.create_item(
+    db_item = crud.create_item(
         db=db, item=item, vault_id=vault_id, creator_id=current_user.id
     )
+    encrypted_encryption_key = item.encrypted_encryption_key
+    crud.create_encryption_key(db, encrypted_encryption_key, current_user.id, vault_id, db_item.id)
+    return db_item
 
 
 @router.get(
@@ -190,9 +193,18 @@ def read_items(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    items = crud.get_items(
+    results = crud.get_items_full(
         db, user_id=current_user.id, vault_id=vault_id, skip=skip, limit=limit
     )
+    items = []
+
+    for result in results:
+        item, encrypted_encryption_key = result
+        # item_data = item.__dict__.copy()  # this copies all the item attributes into a dictionary
+        item_data = {k: v for k, v in item.__dict__.items() if not k.startswith('_')}
+        item_data["encrypted_encryption_key"] = encrypted_encryption_key
+        items.append(schemas.Item(**item_data))
+
     return items
 
 
@@ -207,11 +219,17 @@ def read_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    item = crud.get_item(
-        db, user_id=current_user.id, vault_id=vault_id, item_id=item_id
-    )
-    if item is None:
+    result = crud.get_item_full(
+            db, user_id=current_user.id, vault_id=vault_id, item_id=item_id
+        )
+    if result is None:
         raise HTTPException(status_code=404, detail="Item not found")
+
+    item, encrypted_encryption_key = result
+    # item_data = item.__dict__.copy()  # this copies all the item attributes into a dictionary
+    item_data = {k: v for k, v in item.__dict__.items() if not k.startswith('_')}
+    item_data["encrypted_encryption_key"] = encrypted_encryption_key
+    item = schemas.Item(**item_data)
     return item
 
 
