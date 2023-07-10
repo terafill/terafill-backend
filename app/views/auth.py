@@ -15,8 +15,10 @@ from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response, Cookie
 from srptools import SRPServerSession, SRPContext, constants
 
+import app.utils.errors as internal_exceptions
 from .. import schemas, crud
 from ..database import get_db
+from ..utils.errors import ErrorCodes
 from ..utils.security import get_session_private_key, get_session_token, get_session_details
 
 
@@ -41,7 +43,7 @@ ses_client = session.client('ses')
 class SignupRequest(BaseModel):  # Model for email verification request
     email: str
 
-def send_verification_code(email, verification_code):
+def send_verification_code(email: str, verification_code):
     sender = 'harshitsaini15@gmail.com'
     subject = 'Email Verification Code'
     message = f'Your verification code is {verification_code}'
@@ -66,18 +68,14 @@ def send_verification_code(email, verification_code):
             },
             Source=sender,
         )
-        # print(response)
 
     except ClientError as e:
-        print(e.response['Error']['Message'])
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send verification email")
+        raise internal_exceptions.InternalServerException(
+            message="Something went wrong. Failed to send verification email")
     except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send verification email")
+        raise internal_exceptions.InternalServerException(
+            message="Something went wrong. Failed to send verification email")
 
 
 @router.post("/auth/signup/", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
@@ -108,24 +106,15 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
             crud.update_user(db=db, db_user=user, user=updated_user)
 
         elif user_type == "confirmed":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email is already registered.",
-            )
+            raise internal_exceptions.EmailAlreadyRegisteredException()
+
         elif user_type == "deactivated":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Email is deactivated. Please contact support for resolution.",
-            )
+            raise internal_exceptions.EmailDeactivatedException()
     except HTTPException:
         raise
     except Exception as e:
         logging.error(f"Something went wrong {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Something went wrong. Please try again.",
-        )
-
+        raise internal_exceptions.InternalServerException()
 
 
 class SignupConfirmationRequest(BaseModel):  # Model for email verification code request
@@ -162,10 +151,7 @@ def confirm_sign_up(
         user = crud.get_user_by_email(db, email)
 
         if str(user.email_verification_code) != str(verification_code):  # verify email
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid verification code provided, please try again.",
-            )
+            raise internal_exceptions.InvalidVerificationCodeException()
 
         user_id = user.id
 
@@ -192,13 +178,13 @@ def confirm_sign_up(
         raise
     except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong"
-        )
+        raise internal_exceptions.InternalServerException()
     else:
         # Create deafult vault
         vault = schemas.VaultCreate(name="Default Vault", is_default=True)
-        crud.create_vault(db, vault, creator_id=user_id)
+        db_vault = crud.create_vault(db, vault, creator_id=user_id)
+
+        # logging.error(f"created vault {user_id}", db_vault)
 
         # schemas.ItemCreate(
         #     title="Keylance Master Password",
@@ -208,45 +194,7 @@ def confirm_sign_up(
         # )
         # crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
 
-        # session_details = build_session(db, user_id, client_id, platform_client_id)
-
-        # # Set cookies with httpOnly flag set to true
-        # response.set_cookie(
-        #     key="sessionId",
-        #     value=session_details["sessionId"],
-        #     httponly=True,
-        #     max_age=7 * 24 * 60 * 60,
-        #     secure=False,
-        #     samesite="lax"
-        # )
-        # response.set_cookie(
-        #     key="sessionToken",
-        #     value=session_details["sessionToken"],
-        #     httponly=True,
-        #     max_age=7 * 24 * 60 * 60,
-        #     secure=False,
-        #     samesite="lax"
-        # )
-
-        # response.set_cookie(
-        #     key="userId",
-        #     value=user_id,
-        #     httponly=False,
-        #     max_age=7 * 24 * 60 * 60,
-        #     secure=False,
-        #     samesite="lax"
-        # )
-
-        # response.set_cookie(
-        #     key="platformClientId",
-        #     value=session_details["platformClientId"],
-        #     httponly=True,
-        #     max_age=7 * 24 * 60 * 60,
-        #     secure=False,
-        #     samesite="lax"
-        # )
         return {
-            # "csdek": session_details["csdek"]
         }
 
 
@@ -314,10 +262,7 @@ def get_salt(
         # Get user details
         db_user = crud.get_user_by_email(db, email)
         if db_user is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found.",
-            )
+            raise internal_exceptions.UserNotFoundException()
         user_id = db_user.id
 
         db_srp_data = crud.get_srp_data(db, user_id)
@@ -328,9 +273,7 @@ def get_salt(
         raise
     except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong."
-        )
+        raise internal_exceptions.InternalServerException()
     else:
         return {
             "salt": salt
@@ -357,10 +300,7 @@ def login(
         # Get user details
         db_user = crud.get_user_by_email(db, email)
         if db_user is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found.",
-            )
+            raise internal_exceptions.UserNotFoundException()
         user_id = db_user.id
 
         db_srp_data = crud.get_srp_data(db, user_id)
@@ -382,9 +322,7 @@ def login(
         raise
     except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong."
-        )
+        raise internal_exceptions.InternalServerException()
     else:
         # generate session
         session_details = build_session(
@@ -450,10 +388,7 @@ def login_confirm(
         # Get user details
         db_user = crud.get_user_by_email(db, email)
         if db_user is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found.",
-            )
+            raise internal_exceptions.UserNotFoundException()
         user_id = db_user.id
 
         db_session = crud.get_session(db, user_id, session_id)
@@ -469,9 +404,6 @@ def login_confirm(
                 db_srp_data.verifier,
                 db_session.session_srp_server_private_key)
 
-            print("server.private", server.private)
-            print("server.public", server.public)
-
             session_key, client_key_proof, server_key_proof = \
                 server.process(db_session.session_srp_client_public_key, db_srp_data.salt)
 
@@ -479,26 +411,17 @@ def login_confirm(
                 db_session.session_token,
                 db_session.session_private_key)
 
-            print(client_key_proof, client_proof)
-
             if client_key_proof.decode() != client_proof:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid Client proof.",
-                )
+                raise internal_exceptions.InvalidClientProofException()
         else:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Session doesn't exists."
-            )
+            raise internal_exceptions.SessionNotFoundException()
+
     except HTTPException:
         raise
     except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Something went wrong."
-        )
+        raise internal_exceptions.InternalServerException()
     else:
-
         key_wrapping_key = crud.get_key_wrapping_key(db, user_id=user_id).encrypted_private_key
 
         # expire active sessions
@@ -543,10 +466,7 @@ def logout(
         if db_session:
             session_details = get_session_details(session_token, db_session.session_private_key)
             if session_details["sessionId"] != session_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid Session token.",
-                )
+                raise internal_exceptions.InvalidSessionException()
 
             # expire active sessions which belong to specific browser/device
             crud.expire_active_sessions(
@@ -565,10 +485,7 @@ def logout(
         raise
     except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Something went wrong.",
-        )
+        raise internal_exceptions.InternalServerException()
 
 
 @router.post("/auth/login/refresh", status_code=status.HTTP_200_OK, tags=["auth"])
@@ -638,19 +555,13 @@ def login_refresh(
             }
 
         else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session doesn't exists.",
-            )
+            raise internal_exceptions.SessionNotFoundException()
     except HTTPException:
         raise
     except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
 
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Something went wrong.",
-        )
+        raise internal_exceptions.InternalServerException()
 
 
 @router.get("/auth/status", status_code=status.HTTP_200_OK, tags=["auth"])
@@ -670,10 +581,7 @@ async def auth_status(
         if db_session:
             session_details = get_session_details(session_token, db_session.session_private_key)
             if session_details["sessionId"] != session_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid Session token.",
-                )
+                raise internal_exceptions.InvalidSessionException()
 
             if datetime.utcnow() > db_session.expiry_at:
                 # expire active sessions which belong to specific browser/device
@@ -694,9 +602,6 @@ async def auth_status(
         raise
     except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Something went wrong.",
-        )
+        raise internal_exceptions.InternalServerException()
     else:
         return {"loggedIn": True}
