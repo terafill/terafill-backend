@@ -1,7 +1,9 @@
 from datetime import datetime, date
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr, UUID4
+from pydantic import ConfigDict, BaseModel, EmailStr, UUID4
+
+from app.utils.schema_helpers import to_lower_camel_case
 
 
 class Gender(str, Enum):
@@ -31,7 +33,13 @@ class UserBase(BaseModel):
     birthday: Optional[date] = None
     gender: Optional[Gender] = None
     status: Optional[str] = None
-    email_verification_code: Optional[str] = None
+    email_verification_code: Optional[int] = None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_lower_camel_case,
+        populate_by_name=True
+    )
 
 
 class UserCreate(UserBase):
@@ -46,13 +54,11 @@ class UserUpdate(UserBase):
 class UserProfileImage(UserBase):
     profile_image: Optional[bytes] = None
 
-    class Config:
-        orm_mode = True
+    # model_config = ConfigDict(from_attributes=True)
 
 
 class User(UserBase):
     id: UUID4
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    # model_config = ConfigDict(from_attributes=True)

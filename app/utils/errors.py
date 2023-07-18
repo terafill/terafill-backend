@@ -12,6 +12,7 @@ class ErrorCodes(Enum):
     INVALID_CLIENT_PROOF = 1005
     SESSION_NOT_FOUND = 1006
     INVALID_SESSION = 1007
+    ITEM_NOT_FOUND = 1008
 
 
 class InternalServerException(HTTPException):
@@ -98,5 +99,16 @@ class InvalidSessionException(HTTPException):
         super().__init__(status_code, detail={
                 "error": "INVALID_SESSION",
                 "code": ErrorCodes.INVALID_SESSION.value,
+                "info": message
+            }, headers=headers)
+
+
+class ItemNotFoundException(HTTPException):
+    def __init__(self, status_code: int = status.HTTP_404_NOT_FOUND, message: Optional[str] = None, headers: Optional[dict] = None):
+        if not message:
+            message = "Item not found."
+        super().__init__(status_code, detail={
+                "error": "ITEM_NOT_FOUND",
+                "code": ErrorCodes.ITEM_NOT_FOUND.value,
                 "info": message
             }, headers=headers)

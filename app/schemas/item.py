@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Optional, Union, List
-from pydantic import BaseModel, UUID4
+from pydantic import ConfigDict, BaseModel, UUID4
 from enum import Enum
+
+from app.utils.schema_helpers import to_lower_camel_case
 
 
 class ItemType(str, Enum):
@@ -27,6 +29,12 @@ class ItemBase(BaseModel):
     type: Optional[ItemType] = None
     encrypted_encryption_key: Optional[str] = None
 
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_lower_camel_case,
+        populate_by_name=True
+    )
+
 
 class ItemCreate(ItemBase):
     title: str
@@ -41,6 +49,4 @@ class Item(ItemBase):
     creator_id: UUID4
     created_at: datetime
     vault_id: UUID4
-
-    class Config:
-        orm_mode = True
+    # model_config = ConfigDict(from_attributes=True)

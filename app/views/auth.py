@@ -9,18 +9,18 @@ from typing import Annotated, Union
 from datetime import datetime
 
 import boto3
-from pydantic import BaseModel, EmailStr
+from pydantic import ConfigDict, BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response, Cookie
 from srptools import SRPServerSession, SRPContext, constants
 
 import app.utils.errors as internal_exceptions
+from app.utils.schema_helpers import to_lower_camel_case
 from .. import schemas, crud
 from ..database import get_db
 from ..utils.errors import ErrorCodes
 from ..utils.security import get_session_private_key, get_session_token, get_session_details
-
 
 router = APIRouter()
 
@@ -126,6 +126,11 @@ class SignupConfirmationRequest(BaseModel):  # Model for email verification code
     verifier: str
     salt: str
     encrypted_key_wrapping_key: str
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_lower_camel_case,
+        populate_by_name=True
+    )
 
 # Endpoint for verifying email code
 @router.post(
@@ -283,6 +288,11 @@ class LoginRequest(BaseModel):
     email: EmailStr
     client_public_key: str
     # mpesk: str
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_lower_camel_case,
+        populate_by_name=True
+    )
 
 
 @router.post("/auth/login/", status_code=status.HTTP_200_OK, tags=["auth"])
@@ -361,13 +371,18 @@ def login(
         )
         return {
             "salt": salt,
-            "server_public_key": server_public_key,
+            "serverPublicKey": server_public_key,
         }
 
 
 class LoginConfirmationRequest(BaseModel):
     email: EmailStr
     client_proof: str
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_lower_camel_case,
+        populate_by_name=True
+    )
 
 @router.post("/auth/login/confirm", status_code=status.HTTP_200_OK, tags=["auth"])
 def login_confirm(
@@ -443,8 +458,8 @@ def login_confirm(
             samesite="lax"
         )
         return {
-            "server_proof": server_key_proof,
-            "key_wrapping_key": key_wrapping_key,
+            "serverProof": server_key_proof,
+            "keyWrappingKey": key_wrapping_key,
         }
 
 

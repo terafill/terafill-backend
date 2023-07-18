@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime
 
-from pydantic import BaseModel, UUID4
+from pydantic import ConfigDict, BaseModel, UUID4
 
 
 class MasterPasswordBase(BaseModel):
@@ -19,6 +19,4 @@ class MasterPasswordUpdate(MasterPasswordBase):
 class MasterPassword(MasterPasswordBase):
     user_id: UUID4
     created_at: datetime
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

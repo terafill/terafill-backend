@@ -4,7 +4,7 @@ from typing import List, Annotated, Union
 from fastapi import APIRouter, Depends, HTTPException, status, Cookie, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
-# from ..database import SessionLocal, engine
+import app.utils.errors as internal_exceptions
 from .. import models, schemas, crud
 from ..utils.security import get_current_user
 from ..database import get_db
@@ -18,6 +18,7 @@ def read_user_me(
     current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     db_user = crud.get_user(db, user_id=current_user.id)
+    print(db_user.__dict__["status"], db_user.__dict__["id"])
     return db_user
 
 
@@ -249,7 +250,7 @@ def update_item(
         db, user_id=current_user.id, vault_id=vault_id, item_id=item_id
     )
     if db_item is None:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise internal_exceptions.ItemNotFoundException()
     return crud.update_item(db=db, db_item=db_item, item=item)
 
 
@@ -268,7 +269,7 @@ def delete_item(
         db, user_id=current_user.id, vault_id=vault_id, item_id=item_id
     )
     if db_item is None:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise internal_exceptions.ItemNotFoundException()
     crud.delete_item(db=db, db_item=db_item)
 
 
@@ -283,45 +284,45 @@ def create_master_password_for_user(
     )
 
 
-@router.get("/users/me/master-password/", response_model=schemas.MasterPassword)
-def read_master_password(
-    db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
-):
-    master_password = crud.get_master_password(db, user_id=current_user.id)
-    if master_password is None:
-        raise HTTPException(status_code=404, detail="Master Password not found")
-    return master_password
+# @router.get("/users/me/master-password/", response_model=schemas.MasterPassword)
+# def read_master_password(
+#     db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+# ):
+#     master_password = crud.get_master_password(db, user_id=current_user.id)
+#     if master_password is None:
+#         raise HTTPException(status_code=404, detail="Master Password not found")
+#     return master_password
 
 
-@router.put("/users/me/master-password/", response_model=schemas.MasterPassword)
-def update_master_password(
-    master_password: schemas.MasterPasswordUpdate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
-):
-    db_master_password = crud.get_master_password(db, user_id=current_user.id)
-    if db_master_password is None:
-        raise HTTPException(status_code=404, detail="Master Password not found")
-    return crud.update_master_password(
-        db=db, db_master_password=db_master_password, master_password=master_password
-    )
+# @router.put("/users/me/master-password/", response_model=schemas.MasterPassword)
+# def update_master_password(
+#     master_password: schemas.MasterPasswordUpdate,
+#     db: Session = Depends(get_db),
+#     current_user: models.User = Depends(get_current_user),
+# ):
+#     db_master_password = crud.get_master_password(db, user_id=current_user.id)
+#     if db_master_password is None:
+#         raise HTTPException(status_code=404, detail="Master Password not found")
+#     return crud.update_master_password(
+#         db=db, db_master_password=db_master_password, master_password=master_password
+#     )
 
 
-@router.delete("/users/me/master-password/", status_code=status.HTTP_204_NO_CONTENT)
-def delete_master_password(
-    db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
-):
-    db_master_password = crud.get_master_password(db, user_id=current_user.id)
-    if db_master_password is None:
-        raise HTTPException(status_code=404, detail="Master Password not found")
-    crud.delete_master_password(db=db, db_master_password=db_master_password)
+# @router.delete("/users/me/master-password/", status_code=status.HTTP_204_NO_CONTENT)
+# def delete_master_password(
+#     db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+# ):
+#     db_master_password = crud.get_master_password(db, user_id=current_user.id)
+#     if db_master_password is None:
+#         raise HTTPException(status_code=404, detail="Master Password not found")
+#     crud.delete_master_password(db=db, db_master_password=db_master_password)
 
 
 @router.post("/users/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise internal_exceptions.EmailAlreadyRegisteredException()
     return crud.create_user(db=db, user=user)
 
 
@@ -344,7 +345,7 @@ def read_user(
 ):
     user = crud.get_user(db=db, user_id=user_id)
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise internal_exceptions.UserNotFoundException()
     return user
 
 
@@ -357,7 +358,7 @@ def update_user(
 ):
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise internal_exceptions.UserNotFoundException()
     return crud.update_user(db=db, db_user=db_user, user=user)
 
 
@@ -369,5 +370,5 @@ def delete_user(
 ):
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise internal_exceptions.UserNotFoundException()
     crud.delete_user(db=db, db_user=db_user)
