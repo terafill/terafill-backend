@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from .config import DATABASE_URL
 
 
-engine = create_engine(DATABASE_URL, echo=False)
+engine = create_engine(DATABASE_URL, echo=False, query_cache_size=0)
 
 
 # Dependency

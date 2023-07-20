@@ -33,7 +33,6 @@ def get_session_private_key():
     )
 
     session_private_key = private_key_pem.decode()
-
     return session_private_key
 
 
@@ -63,7 +62,6 @@ def get_session_token(
     session_id,
     client_id,
     platform_client_id,
-    csdek,
     session_private_key
 ):
     jwe = JsonWebEncryption()
@@ -73,7 +71,6 @@ def get_session_token(
         "sessionId": session_id,
         "clientId": client_id,
         "platformClientId": platform_client_id,
-        "csdek": csdek,
         "tier": "pro",
     })
 
@@ -127,17 +124,18 @@ async def get_current_user(
                     detail="Invalid Session token.",
                 )
 
-            if datetime.utcnow() > db_session.expiry_at:
+            if datetime.utcnow() > db_session.expiry_at or not db_session.activated:
                 # expire active sessions which belong to specific browser/device
                 crud.expire_active_sessions(
                     db,
                     user_id=session_details["userId"],
                     client_id=session_details["clientId"],
-                    platform_client_id=session_details["platformClientId"]
+                    platform_client_id=session_details["platformClientId"],
+                    session_id=session_id
                 )
                 raise HTTPException(
                     status_code=401,
-                    detail="Session token is invalid. Token has expired."
+                    detail="Session token is invalid. Token has expired or is inactive."
                 )
     except HTTPException:
         raise

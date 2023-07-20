@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
+from . import utils
+
 # from fastapi.openapi.docs import get_swagger_ui_html
 
 # from . import models, views
