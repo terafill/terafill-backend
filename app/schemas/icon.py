@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, Union, List
-from pydantic import BaseModel, UUID4
+from pydantic import ConfigDict, BaseModel, UUID4
 from enum import Enum
 
 
@@ -10,5 +10,4 @@ class IconBase(BaseModel):
 
 
 class Icon(IconBase):
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
