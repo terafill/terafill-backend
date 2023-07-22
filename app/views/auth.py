@@ -8,6 +8,9 @@ import logging
 from typing import Annotated, Union
 from datetime import datetime
 
+logging.basicConfig(level=logging.ERROR)
+
+
 import boto3
 from pydantic import ConfigDict, BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -78,9 +81,10 @@ def send_verification_code(email: str, verification_code):
             message="Something went wrong. Failed to send verification email")
 
 
-@router.post("/auth/signup/", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
+@router.post("/auth/signup", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
 def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
     try:
+        logging.info("msgmsgmsgmsg")
         email = signup_request.email
         user_type = None
 
@@ -88,7 +92,9 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
         if not user:  # new user
             user_data = schemas.UserCreate(
                 email=email,
-                status="unconfirmed")
+                status="unconfirmed",
+                first_name="",
+                last_name="")
             user = crud.create_user(db, user_data)
             user_type = "new"
         else:
@@ -113,6 +119,7 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Something went wrong {e}")
         logging.error(f"Something went wrong {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
 
@@ -253,7 +260,7 @@ def build_session(
 class SaltRequest(BaseModel):
     email: EmailStr
 
-@router.post("/auth/salt/", status_code=status.HTTP_200_OK, tags=["auth"])
+@router.post("/auth/salt", status_code=status.HTTP_200_OK, tags=["auth"])
 def get_salt(
     response: Response,
     login_request: SaltRequest,
@@ -295,7 +302,7 @@ class LoginRequest(BaseModel):
     )
 
 
-@router.post("/auth/login/", status_code=status.HTTP_200_OK, tags=["auth"])
+@router.post("/auth/login", status_code=status.HTTP_200_OK, tags=["auth"])
 def login(
     response: Response,
     login_request: LoginRequest,
@@ -350,24 +357,24 @@ def login(
             value=session_details["sessionId"],
             httponly=True,
             max_age=7 * 24 * 60 * 60,
-            secure=False,
-            samesite="lax"
+            secure=True,
+            samesite="none"
         )
         response.set_cookie(
             key="platformClientId",
             value=session_details["platformClientId"],
             httponly=True,
             max_age=7 * 24 * 60 * 60,
-            secure=False,
-            samesite="lax"
+            secure=True,
+            samesite="none"
         )
         response.set_cookie(
             key="userId",
             value=user_id,
             httponly=False,
             max_age=7 * 24 * 60 * 60,
-            secure=False,
-            samesite="lax"
+            secure=True,
+            samesite="none"
         )
         return {
             "salt": salt,
@@ -454,8 +461,8 @@ def login_confirm(
             value=db_session.session_token,
             httponly=True,
             max_age=7 * 24 * 60 * 60,
-            secure=False,
-            samesite="lax"
+            secure=True,
+            samesite="none"
         )
         return {
             "serverProof": server_key_proof,
@@ -463,7 +470,7 @@ def login_confirm(
         }
 
 
-@router.post("/auth/logout/", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
+@router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
 def logout(
     response: Response,
     db: Session = Depends(get_db),

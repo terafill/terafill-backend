@@ -4,8 +4,13 @@ from sqlalchemy.orm import sessionmaker
 
 from .config import DATABASE_URL
 
-
-engine = create_engine(DATABASE_URL, echo=False, query_cache_size=0)
+ca_path = "/etc/ssl/certs/ca-certificates.crt"
+ssl_args = {'ssl_ca': ca_path}
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    query_cache_size=0,
+    connect_args=ssl_args)
 
 
 # Dependency

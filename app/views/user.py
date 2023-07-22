@@ -13,7 +13,7 @@ from ..database import get_db
 router = APIRouter(dependencies=[], tags=["user"])
 
 
-@router.get("/users/me/", response_model=schemas.User, tags=["current_user"])
+@router.get("/users/me", response_model=schemas.User, tags=["current_user"])
 def read_user_me(
     current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -22,7 +22,7 @@ def read_user_me(
     return db_user
 
 
-@router.get("/users/me/profile-image/", response_model=schemas.UserProfileImage, tags=["current_user"])
+@router.get("/users/me/profile-image", response_model=schemas.UserProfileImage, tags=["current_user"])
 def read_user_profile_image(
     current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -36,7 +36,7 @@ def read_user_profile_image(
     return user
 
 
-@router.put("/users/me/", status_code=status.HTTP_204_NO_CONTENT, tags=["current_user"])
+@router.put("/users/me", status_code=status.HTTP_204_NO_CONTENT, tags=["current_user"])
 async def update_user_me(
     first_name: str = Form(...),
     last_name: str = Form(...),
@@ -70,7 +70,7 @@ async def update_user_me(
 # async def get_user_id(user_id: str = Header()):
 #     return user_id
 
-@router.post("/users/me/vaults/", response_model=schemas.Vault, tags=["current_user"])
+@router.post("/users/me/vaults", response_model=schemas.Vault, tags=["current_user"])
 def create_vault(
     vault: schemas.VaultCreate,
     db: Session = Depends(get_db),
@@ -80,7 +80,7 @@ def create_vault(
 
 
 @router.get(
-    "/users/me/vaults/", response_model=List[schemas.Vault], tags=["current_user"]
+    "/users/me/vaults", response_model=List[schemas.Vault], tags=["current_user"]
 )
 def read_vaults(
     skip: int = 0,
@@ -164,7 +164,7 @@ def delete_vault(
 
 
 @router.post(
-    "/users/me/vaults/{vault_id}/items/",
+    "/users/me/vaults/{vault_id}/items",
     response_model=schemas.Item,
     tags=["current_user"],
 )
@@ -183,7 +183,7 @@ def create_item(
 
 
 @router.get(
-    "/users/me/vaults/{vault_id}/items/",
+    "/users/me/vaults/{vault_id}/items",
     response_model=List[schemas.Item],
     tags=["current_user"],
 )
@@ -273,15 +273,15 @@ def delete_item(
     crud.delete_item(db=db, db_item=db_item)
 
 
-@router.post("/users/me/master-password/", response_model=schemas.MasterPassword)
-def create_master_password_for_user(
-    master_password: schemas.MasterPasswordCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
-):
-    return crud.create_master_password(
-        db=db, user_id=current_user.id, password_hash=master_password.password_hash
-    )
+# @router.post("/users/me/master-password/", response_model=schemas.MasterPassword)
+# def create_master_password_for_user(
+#     master_password: schemas.MasterPasswordCreate,
+#     db: Session = Depends(get_db),
+#     current_user: models.User = Depends(get_current_user),
+# ):
+#     return crud.create_master_password(
+#         db=db, user_id=current_user.id, password_hash=master_password.password_hash
+#     )
 
 
 # @router.get("/users/me/master-password/", response_model=schemas.MasterPassword)
@@ -318,7 +318,7 @@ def create_master_password_for_user(
 #     crud.delete_master_password(db=db, db_master_password=db_master_password)
 
 
-@router.post("/users/", response_model=schemas.User)
+@router.post("/users", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
@@ -326,7 +326,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return crud.create_user(db=db, user=user)
 
 
-@router.get("/users/", response_model=List[schemas.User])
+@router.get("/users", response_model=List[schemas.User])
 def read_users(
     skip: int = 0,
     limit: int = 100,

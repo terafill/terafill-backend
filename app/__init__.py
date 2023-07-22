@@ -1,9 +1,13 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
 from . import utils
 
+if int(os.getenv("LOAD_ENV_FROM_FILE", 1)):
+    load_dotenv(".env.dev")
 # from fastapi.openapi.docs import get_swagger_ui_html
 
 # from . import models, views
@@ -16,6 +20,7 @@ from .views import (
     auth,
     icon,
 )
+
 
 
 app = FastAPI()
@@ -34,8 +39,16 @@ app.include_router(icon.router, prefix="/api/v1")
 # Add the CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://keylance-backend-svc-dev.up.railway.app",
+        "https://keylance-dc9c3k23s-harshitsaini.vercel.app"
+        "https://www.keylance.io",
+        "https://keylance.io",
+        "https://keylance.vercel.app",
+        ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )

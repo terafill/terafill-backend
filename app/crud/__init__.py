@@ -28,18 +28,18 @@ from .item import (
     get_items_full,
 )
 
-from .master_password import (
-    get_master_password,
-    create_master_password,
-    update_master_password,
-    delete_master_password,
-)
+# from .master_password import (
+#     get_master_password,
+#     create_master_password,
+#     update_master_password,
+#     delete_master_password,
+# )
 
 
-from .mpesk import (
-    get_mpesk,
-    create_mpesk,
-)
+# from .mpesk import (
+#     get_mpesk,
+#     create_mpesk,
+# )
 
 from .session import (
     get_session,

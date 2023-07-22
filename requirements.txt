@@ -1,4 +1,5 @@
 fastapi[all]
+boto3
 uvicorn
 pyjwt
 pydantic
@@ -7,3 +8,7 @@ pymysql
 mysql-connector-python
 passlib
 python-jose[cryptography]
+cryptography
+python-dotenv
+git+https://github.com/harshitsaini/srptools.git@keylance
+Authlib
