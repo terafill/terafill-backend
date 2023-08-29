@@ -11,13 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from authlib.jose import JsonWebEncryption
 
 from .. import crud
-from ..database import db
-
-
-# Dependency
-def get_db():
-    yield db
-
+from ..database import get_db
 
 def get_session_private_key():
     private_key = rsa.generate_private_key(
@@ -97,8 +91,6 @@ async def get_current_user(
     user_id = userId
     session_id = sessionId
     session_token = sessionToken
-
-    # db.expire_all()
 
     # Check if the user-id was provided
     if not user_id:

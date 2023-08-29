@@ -18,7 +18,6 @@ def read_user_me(
     current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     db_user = crud.get_user(db, user_id=current_user.id)
-    print(db_user.__dict__["status"], db_user.__dict__["id"])
     return db_user
 
 
@@ -90,6 +89,23 @@ def read_vaults(
 ):
     vaults = crud.get_vaults_by_user_id(db, user_id=current_user.id, skip=skip, limit=limit)
     return vaults
+
+
+import requests
+
+@router.get("/fetch-image/")
+def fetch_image(url: str):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        mime_type = response.headers['content-type']
+        base64_image = base64.b64encode(response.content).decode("utf-8")
+        return {"data_url": f"data:{mime_type};base64,{base64_image}"}
+    except requests.HTTPError as e:
+        raise HTTPException(status_code=400, detail="Image not found") from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error") from e
+
 
 
 @router.get(

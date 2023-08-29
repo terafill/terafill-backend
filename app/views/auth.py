@@ -23,7 +23,11 @@ from app.utils.schema_helpers import to_lower_camel_case
 from .. import schemas, crud
 from ..database import get_db
 from ..utils.errors import ErrorCodes
-from ..utils.security import get_session_private_key, get_session_token, get_session_details
+from ..utils.security import (
+    get_session_private_key,
+    get_session_token,
+    get_session_details,
+)
 
 router = APIRouter()
 
@@ -40,33 +44,34 @@ session = boto3.Session(
     region_name=AWS_REGION_NAME,
 )
 
-ses_client = session.client('ses')
+ses_client = session.client("ses")
 
 
 class SignupRequest(BaseModel):  # Model for email verification request
     email: str
 
+
 def send_verification_code(email: str, verification_code):
-    sender = 'harshitsaini15@gmail.com'
-    subject = 'Email Verification Code'
-    message = f'Your verification code is {verification_code}'
+    sender = "harshitsaini15@gmail.com"
+    subject = "Email Verification Code"
+    message = f"Your verification code is {verification_code}"
 
     try:
         # Store verification code in database.
         response = ses_client.send_email(
             Destination={
-                'ToAddresses': [email],
+                "ToAddresses": [email],
             },
             Message={
-                'Body': {
-                    'Text': {
-                        'Charset': 'UTF-8',
-                        'Data': message,
+                "Body": {
+                    "Text": {
+                        "Charset": "UTF-8",
+                        "Data": message,
                     },
                 },
-                'Subject': {
-                    'Charset': 'UTF-8',
-                    'Data': subject,
+                "Subject": {
+                    "Charset": "UTF-8",
+                    "Data": subject,
                 },
             },
             Source=sender,
@@ -74,33 +79,36 @@ def send_verification_code(email: str, verification_code):
 
     except ClientError as e:
         raise internal_exceptions.InternalServerException(
-            message="Something went wrong. Failed to send verification email")
+            message="Something went wrong. Failed to send verification email"
+        )
     except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
         raise internal_exceptions.InternalServerException(
-            message="Something went wrong. Failed to send verification email")
+            message="Something went wrong. Failed to send verification email"
+        )
 
 
 @router.post("/auth/signup", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
 def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
     try:
-        logging.info("msgmsgmsgmsg")
         email = signup_request.email
         user_type = None
 
         user = crud.get_user_by_email(db, email)
         if not user:  # new user
             user_data = schemas.UserCreate(
-                email=email,
-                status="unconfirmed",
-                first_name="",
-                last_name="")
+                email=email, status="unconfirmed", first_name="", last_name=""
+            )
             user = crud.create_user(db, user_data)
             user_type = "new"
         else:
             user_type = user.status
 
-        if user_type in ["new", "need_sign_up", "unconfirmed"]:  # send verification code
+        if user_type in [
+            "new",
+            "need_sign_up",
+            "unconfirmed",
+        ]:  # send verification code
             verification_code = random.randint(100000, 999999)
 
             send_verification_code(email, verification_code)
@@ -108,7 +116,8 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
             updated_user = schemas.UserUpdate(
                 user_id=user.id,
                 email_verification_code=verification_code,
-                status="unconfirmed")
+                status="unconfirmed",
+            )
             crud.update_user(db=db, db_user=user, user=updated_user)
 
         elif user_type == "confirmed":
@@ -134,21 +143,18 @@ class SignupConfirmationRequest(BaseModel):  # Model for email verification code
     salt: str
     encrypted_key_wrapping_key: str
     model_config = ConfigDict(
-        from_attributes=True,
-        alias_generator=to_lower_camel_case,
-        populate_by_name=True
+        from_attributes=True, alias_generator=to_lower_camel_case, populate_by_name=True
     )
 
+
 # Endpoint for verifying email code
-@router.post(
-    "/auth/signup/confirm/", status_code=status.HTTP_200_OK, tags=["auth"]
-)
+@router.post("/auth/signup/confirm/", status_code=status.HTTP_200_OK, tags=["auth"])
 def confirm_sign_up(
     response: Response,
     signup_confirmation_request: SignupConfirmationRequest,
     db: Session = Depends(get_db),
     client_id: Annotated[Union[str, None], Header()] = None,
-    platform_client_id: Annotated[Union[str, None], Cookie()] = None
+    platform_client_id: Annotated[Union[str, None], Cookie()] = None,
 ):
     try:
         email = signup_confirmation_request.email
@@ -158,7 +164,9 @@ def confirm_sign_up(
         last_name = signup_confirmation_request.last_name
         verifier = signup_confirmation_request.verifier
         salt = signup_confirmation_request.salt
-        encrypted_key_wrapping_key = signup_confirmation_request.encrypted_key_wrapping_key
+        encrypted_key_wrapping_key = (
+            signup_confirmation_request.encrypted_key_wrapping_key
+        )
 
         user = crud.get_user_by_email(db, email)
 
@@ -169,9 +177,8 @@ def confirm_sign_up(
 
         # Update user status and profile data
         updated_user = schemas.UserUpdate(
-            first_name=first_name,
-            last_name=last_name,
-            status="confirmed")
+            first_name=first_name, last_name=last_name, status="confirmed"
+        )
         crud.update_user(db=db, db_user=user, user=updated_user)
 
         # # Store MPESK
@@ -182,9 +189,8 @@ def confirm_sign_up(
 
         # Store salt and verifier
         crud.create_key_wrapping_key(
-            db,
-            encrypted_key_wrapping_key=encrypted_key_wrapping_key,
-            user_id=user_id)
+            db, encrypted_key_wrapping_key=encrypted_key_wrapping_key, user_id=user_id
+        )
 
     except HTTPException:
         raise
@@ -206,8 +212,7 @@ def confirm_sign_up(
         # )
         # crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
 
-        return {
-        }
+        return {}
 
 
 def build_session(
@@ -219,7 +224,6 @@ def build_session(
     session_encryption_key,
     platform_client_id=None,
     session_private_key=None,
-
 ):
     if platform_client_id is None:
         platform_client_id = str(uuid.uuid4())
@@ -230,11 +234,8 @@ def build_session(
         session_private_key = get_session_private_key()
 
     session_token = get_session_token(
-        user_id,
-        session_id,
-        client_id,
-        platform_client_id,
-        session_private_key)
+        user_id, session_id, client_id, platform_client_id, session_private_key
+    )
 
     # Update user status and profile data
     session = schemas.SessionCreate(
@@ -257,8 +258,10 @@ def build_session(
         "platformClientId": platform_client_id,
     }
 
+
 class SaltRequest(BaseModel):
     email: EmailStr
+
 
 @router.post("/auth/salt", status_code=status.HTTP_200_OK, tags=["auth"])
 def get_salt(
@@ -266,7 +269,7 @@ def get_salt(
     login_request: SaltRequest,
     db: Session = Depends(get_db),
     client_id: str = Header(),
-    platform_client_id: Annotated[Union[str, None], Cookie()] = None
+    platform_client_id: Annotated[Union[str, None], Cookie()] = None,
 ):
     try:
         email = login_request.email
@@ -287,18 +290,15 @@ def get_salt(
         logging.error(f"Something went wrong: {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
     else:
-        return {
-            "salt": salt
-        }
+        return {"salt": salt}
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
     client_public_key: str
     # mpesk: str
     model_config = ConfigDict(
-        from_attributes=True,
-        alias_generator=to_lower_camel_case,
-        populate_by_name=True
+        from_attributes=True, alias_generator=to_lower_camel_case, populate_by_name=True
     )
 
 
@@ -308,7 +308,7 @@ def login(
     login_request: LoginRequest,
     db: Session = Depends(get_db),
     client_id: str = Header(),
-    platform_client_id: Annotated[Union[str, None], Cookie()] = None
+    platform_client_id: Annotated[Union[str, None], Cookie()] = None,
 ):
     try:
         email = login_request.email
@@ -325,15 +325,19 @@ def login(
         verifier = db_srp_data.verifier
         salt = db_srp_data.salt
 
-        server = SRPServerSession(SRPContext(
-            username=email,
-            prime=constants.PRIME_1024,
-            generator=constants.PRIME_1024_GEN),
-            verifier)
+        server = SRPServerSession(
+            SRPContext(
+                username=email,
+                prime=constants.PRIME_1024,
+                generator=constants.PRIME_1024_GEN,
+            ),
+            verifier,
+        )
 
         server_public_key = server.public
-        session_key, client_key_proof, server_key_proof =\
-            server.process(client_public_key, salt)
+        session_key, client_key_proof, server_key_proof = server.process(
+            client_public_key, salt
+        )
 
     except HTTPException:
         raise
@@ -349,7 +353,8 @@ def login(
             platform_client_id=platform_client_id,
             session_encryption_key=session_key,
             session_srp_client_public_key=client_public_key,
-            session_srp_server_private_key=server.private)
+            session_srp_server_private_key=server.private,
+        )
 
         # Set cookies with httpOnly flag set to true
         response.set_cookie(
@@ -358,7 +363,7 @@ def login(
             httponly=True,
             max_age=7 * 24 * 60 * 60,
             secure=True,
-            samesite="none"
+            samesite="none",
         )
         response.set_cookie(
             key="platformClientId",
@@ -366,7 +371,7 @@ def login(
             httponly=True,
             max_age=7 * 24 * 60 * 60,
             secure=True,
-            samesite="none"
+            samesite="none",
         )
         response.set_cookie(
             key="userId",
@@ -374,11 +379,14 @@ def login(
             httponly=False,
             max_age=7 * 24 * 60 * 60,
             secure=True,
-            samesite="none"
+            samesite="none",
         )
         return {
             "salt": salt,
             "serverPublicKey": server_public_key,
+            "sessionId": session_details["sessionId"],
+            "platformClientId": session_details["platformClientId"],
+            "userId": user_id,
         }
 
 
@@ -386,10 +394,9 @@ class LoginConfirmationRequest(BaseModel):
     email: EmailStr
     client_proof: str
     model_config = ConfigDict(
-        from_attributes=True,
-        alias_generator=to_lower_camel_case,
-        populate_by_name=True
+        from_attributes=True, alias_generator=to_lower_camel_case, populate_by_name=True
     )
+
 
 @router.post("/auth/login/confirm", status_code=status.HTTP_200_OK, tags=["auth"])
 def login_confirm(
@@ -422,16 +429,19 @@ def login_confirm(
                 SRPContext(
                     username=email,
                     prime=constants.PRIME_1024,
-                    generator=constants.PRIME_1024_GEN),
+                    generator=constants.PRIME_1024_GEN,
+                ),
                 db_srp_data.verifier,
-                db_session.session_srp_server_private_key)
+                db_session.session_srp_server_private_key,
+            )
 
-            session_key, client_key_proof, server_key_proof = \
-                server.process(db_session.session_srp_client_public_key, db_srp_data.salt)
+            session_key, client_key_proof, server_key_proof = server.process(
+                db_session.session_srp_client_public_key, db_srp_data.salt
+            )
 
             session_details = get_session_details(
-                db_session.session_token,
-                db_session.session_private_key)
+                db_session.session_token, db_session.session_private_key
+            )
 
             if client_key_proof.decode() != client_proof:
                 raise internal_exceptions.InvalidClientProofException()
@@ -444,16 +454,17 @@ def login_confirm(
         logging.error(f"Something went wrong: {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
     else:
-        key_wrapping_key = crud.get_key_wrapping_key(db, user_id=user_id).encrypted_private_key
+        key_wrapping_key = crud.get_key_wrapping_key(
+            db, user_id=user_id
+        ).encrypted_private_key
 
         # expire active sessions
-        crud.expire_active_sessions(db, user_id, client_id, platform_client_id, session_id)
+        crud.expire_active_sessions(
+            db, user_id, client_id, platform_client_id, session_id
+        )
 
         # Activate session
-        session = schemas.SessionUpdate(
-            id=session_id,
-            user_id=user_id,
-            activated=True)
+        session = schemas.SessionUpdate(id=session_id, user_id=user_id, activated=True)
         crud.update_session(db, db_session, session)
 
         response.set_cookie(
@@ -462,11 +473,12 @@ def login_confirm(
             httponly=True,
             max_age=7 * 24 * 60 * 60,
             secure=True,
-            samesite="none"
+            samesite="none",
         )
         return {
             "serverProof": server_key_proof,
             "keyWrappingKey": key_wrapping_key,
+            "sessionToken": db_session.session_token,
         }
 
 
@@ -486,7 +498,9 @@ def logout(
         db_session = crud.get_session(db, user_id, session_id)
 
         if db_session:
-            session_details = get_session_details(session_token, db_session.session_private_key)
+            session_details = get_session_details(
+                session_token, db_session.session_private_key
+            )
             if session_details["sessionId"] != session_id:
                 raise internal_exceptions.InvalidSessionException()
 
@@ -516,10 +530,9 @@ def login_refresh(
     db: Session = Depends(get_db),
     session_id: str = Header(),
     user_id: str = Header(),
-    session_token: str = Header()
+    session_token: str = Header(),
 ):
     try:
-
         email = login_request.email
         mpesk = login_request.mpesk
 
@@ -543,7 +556,9 @@ def login_refresh(
         db_session = crud.get_session(db, user_id, session_id)
 
         if db_session:
-            session_details = get_session_details(session_token, db_session.session_private_key)
+            session_details = get_session_details(
+                session_token, db_session.session_private_key
+            )
             if session_details["sessionId"] != session_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -555,7 +570,7 @@ def login_refresh(
                 db,
                 user_id=session_details["userId"],
                 client_id=session_details["clientId"],
-                platform_client_id=session_details["platformClientId"]
+                platform_client_id=session_details["platformClientId"],
             )
 
             # generate session
@@ -565,7 +580,7 @@ def login_refresh(
                 session_details["clientId"],
                 session_details["platformClientId"],
                 csdek=session_details["csdek"],
-                session_private_key=db_session.session_private_key
+                session_private_key=db_session.session_private_key,
             )
 
             return {
@@ -573,7 +588,7 @@ def login_refresh(
                 "sessionId": new_session_details["sessionId"],
                 "sessionToken": new_session_details["sessionToken"],
                 "csdek": new_session_details["csdek"],
-                "platformClientId": new_session_details["platformClientId"]
+                "platformClientId": new_session_details["platformClientId"],
             }
 
         else:
@@ -592,7 +607,7 @@ async def auth_status(
     db: Session = Depends(get_db),
     userId: str = Cookie(),
     sessionId: str = Cookie(),
-    sessionToken: str = Cookie()
+    sessionToken: str = Cookie(),
 ):
     try:
         user_id = userId
@@ -601,7 +616,9 @@ async def auth_status(
         db_session = crud.get_session(db, user_id, session_id)
 
         if db_session:
-            session_details = get_session_details(session_token, db_session.session_private_key)
+            session_details = get_session_details(
+                session_token, db_session.session_private_key
+            )
             if session_details["sessionId"] != session_id:
                 raise internal_exceptions.InvalidSessionException()
 

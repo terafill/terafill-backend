@@ -25,6 +25,6 @@ def get_db():
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-db = SessionLocal()
+# db = SessionLocal()
 
 Base = declarative_base()

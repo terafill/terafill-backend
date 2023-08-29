@@ -6,8 +6,17 @@ from fastapi.openapi.utils import get_openapi
 
 from . import utils
 
+ENV = os.getenv("ENV", "LOCAL")
+
+env2config = {
+    "DEV": ".env.dev",
+    "PROD": ".env.prod",
+    "LOCAL": ".env.local",
+}
+
 if int(os.getenv("LOAD_ENV_FROM_FILE", 1)):
-    load_dotenv(".env.dev")
+    load_dotenv(env2config[ENV])
+
 # from fastapi.openapi.docs import get_swagger_ui_html
 
 # from . import models, views
@@ -40,11 +49,17 @@ app.include_router(icon.router, prefix="/api/v1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "https://keylance-backend-svc-dev.up.railway.app",
-        "https://keylance-dc9c3k23s-harshitsaini.vercel.app"
-        "https://www.keylance.io",
-        "https://keylance.io",
+        "chrome-extension://khlffdhmbhlkkmcgmhbhjpjidllcdgmb",
+        "https://dev.terafill.com"
+        "https://dev.api.terafill.com"
+        # "*"
+        # "http://localhost:3000",
+        # "http://localhost:3004",
+        # "https://keylance-backend-svc-dev.up.railway.app",
+        # "https://keylance-dc9c3k23s-harshitsaini.vercel.app"
+        # "https://www.keylance.io",
+        # "https://keylance.io",
+        "https://keylance-harshitsaini.vercel.app",
         "https://keylance.vercel.app",
         ],
     allow_credentials=True,
