@@ -1,8 +1,19 @@
 import base64
 from typing import List, Annotated, Union
 
-from fastapi import APIRouter, Depends, HTTPException, status, Cookie, UploadFile, File, Form
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    Cookie,
+    UploadFile,
+    File,
+    Form,
+    Response,
+)
 from sqlalchemy.orm import Session
+import requests
 
 import app.utils.errors as internal_exceptions
 from .. import models, schemas, crud
@@ -13,6 +24,11 @@ from ..database import get_db
 router = APIRouter(dependencies=[], tags=["user"])
 
 
+@router.get("/hello")
+async def hello():
+    return "hello"
+
+
 @router.get("/users/me", response_model=schemas.User, tags=["current_user"])
 def read_user_me(
     current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
@@ -21,13 +37,17 @@ def read_user_me(
     return db_user
 
 
-@router.get("/users/me/profile-image", response_model=schemas.UserProfileImage, tags=["current_user"])
+@router.get(
+    "/users/me/profile-image",
+    response_model=schemas.UserProfileImage,
+    tags=["current_user"],
+)
 def read_user_profile_image(
     current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     image_binary_data = crud.get_user_profile_image(db, user_id=current_user.id)
     if image_binary_data:
-        image_base64 = base64.b64encode(image_binary_data).decode('utf-8')
+        image_base64 = base64.b64encode(image_binary_data).decode("utf-8")
     else:
         image_base64 = None
 
@@ -46,17 +66,14 @@ async def update_user_me(
 ):
     # Create UserUpdate schema
     user_update = schemas.UserUpdate(
-        first_name=first_name,
-        last_name=last_name,
-        phone_no=phone_no
+        first_name=first_name, last_name=last_name, phone_no=phone_no
     )
 
     # Read the file
     file_contents = None
     if file:
         file_contents = await file.read()
-        user_update.profile_image=file_contents
-
+        user_update.profile_image = file_contents
 
     db_user = crud.get_user(db, user_id=current_user.id)
     crud.update_user(db=db, db_user=db_user, user=user_update)
@@ -68,6 +85,7 @@ async def update_user_me(
 
 # async def get_user_id(user_id: str = Header()):
 #     return user_id
+
 
 @router.post("/users/me/vaults", response_model=schemas.Vault, tags=["current_user"])
 def create_vault(
@@ -82,30 +100,30 @@ def create_vault(
     "/users/me/vaults", response_model=List[schemas.Vault], tags=["current_user"]
 )
 def read_vaults(
+    response: Response,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    vaults = crud.get_vaults_by_user_id(db, user_id=current_user.id, skip=skip, limit=limit)
+    vaults = crud.get_vaults_by_user_id(
+        db, user_id=current_user.id, skip=skip, limit=limit
+    )
     return vaults
 
 
-import requests
-
-@router.get("/fetch-image/")
+@router.get("/fetch-image")
 def fetch_image(url: str):
     try:
         response = requests.get(url)
         response.raise_for_status()
-        mime_type = response.headers['content-type']
+        mime_type = response.headers["content-type"]
         base64_image = base64.b64encode(response.content).decode("utf-8")
         return {"data_url": f"data:{mime_type};base64,{base64_image}"}
     except requests.HTTPError as e:
         raise HTTPException(status_code=400, detail="Image not found") from e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal server error") from e
-
 
 
 @router.get(
@@ -120,6 +138,7 @@ def read_vault(
     if vault is None:
         raise HTTPException(status_code=404, detail="Vault not found")
     return vault
+
 
 # @router.post(
 #     "/users/me/vaults/{vault_id}/share",
@@ -194,7 +213,9 @@ def create_item(
         db=db, item=item, vault_id=vault_id, creator_id=current_user.id
     )
     encrypted_encryption_key = item.encrypted_encryption_key
-    crud.create_encryption_key(db, encrypted_encryption_key, current_user.id, vault_id, db_item.id)
+    crud.create_encryption_key(
+        db, encrypted_encryption_key, current_user.id, vault_id, db_item.id
+    )
     return db_item
 
 
@@ -218,7 +239,7 @@ def read_items(
     for result in results:
         item, encrypted_encryption_key = result
         # item_data = item.__dict__.copy()  # this copies all the item attributes into a dictionary
-        item_data = {k: v for k, v in item.__dict__.items() if not k.startswith('_')}
+        item_data = {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
         item_data["encrypted_encryption_key"] = encrypted_encryption_key
         items.append(schemas.Item(**item_data))
 
@@ -237,14 +258,14 @@ def read_item(
     current_user: models.User = Depends(get_current_user),
 ):
     result = crud.get_item_full(
-            db, user_id=current_user.id, vault_id=vault_id, item_id=item_id
-        )
+        db, user_id=current_user.id, vault_id=vault_id, item_id=item_id
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="Item not found")
 
     item, encrypted_encryption_key = result
     # item_data = item.__dict__.copy()  # this copies all the item attributes into a dictionary
-    item_data = {k: v for k, v in item.__dict__.items() if not k.startswith('_')}
+    item_data = {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
     item_data["encrypted_encryption_key"] = encrypted_encryption_key
     item = schemas.Item(**item_data)
     return item

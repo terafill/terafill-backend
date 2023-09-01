@@ -1,0 +1,69 @@
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+DATABASE_URL = (
+    "mysql+pymysql://keylance_backend:Keylance_backend_123@localhost:3306/keylance"
+)
+
+ca_path = "/etc/ssl/certs/ca-certificates.crt"
+ssl_args = {"ssl_ca": ca_path}
+
+engine = create_engine(
+    DATABASE_URL, echo=False, query_cache_size=0, connect_args=ssl_args
+)
+
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# db = SessionLocal()
+
+Base = declarative_base()
+
+from datetime import datetime
+from enum import Enum as PyEnum
+
+from sqlalchemy import Column, Integer, String, Date, DateTime, Enum, LargeBinary
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
+
+class Gender(str, PyEnum):
+    male = "male"
+    female = "female"
+    non_binary = "non-binary"
+    transgender = "transgender"
+    genderqueer = "genderqueer"
+    two_spirit = "two-spirit"
+    bigender = "bigender"
+    pangender = "pangender"
+    agender = "agender"
+    demigender = "demigender"
+    third_gender = "third gender"
+    androgynous = "androgynous"
+    intersex = "intersex"
+    questioning = "questioning"
+    other = "other"
+
+
+class Status(str, PyEnum):
+    new_sign_up = "new_sign_up"
+    unconfirmed = "unconfirmed"
+    confirmed = "confirmed"
+    deactivated = "deactivated"
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(String(128), primary_key=True, index=True)
+    email_verification_code = Column(Integer)
+    email = Column(String(255), unique=True, index=True)
+    secondary_email = Column(String(255))
+    phone_no = Column(String(15))
+    first_name = Column(String(100))
+    last_name = Column(String(100))
+    birthday = Column(Date)
+    gender = Column(Enum(Gender, name="gender"))
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    status = Column(Enum(Status, name="status"), nullable=False)
+    profile_image = Column(LargeBinary)

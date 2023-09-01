@@ -89,7 +89,7 @@ def send_verification_code(email: str, verification_code):
 
 
 @router.post("/auth/signup", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
-def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
+def signup(signup_request: SignupRequest, db: Session = Depends(get_db), mock: bool = False):
     try:
         email = signup_request.email
         user_type = None
@@ -111,7 +111,10 @@ def signup(signup_request: SignupRequest, db: Session = Depends(get_db)):
         ]:  # send verification code
             verification_code = random.randint(100000, 999999)
 
-            send_verification_code(email, verification_code)
+            if not mock:
+                send_verification_code(email, verification_code)
+            else:
+                print("send_verification_code not triggered")
 
             updated_user = schemas.UserUpdate(
                 user_id=user.id,
@@ -148,7 +151,7 @@ class SignupConfirmationRequest(BaseModel):  # Model for email verification code
 
 
 # Endpoint for verifying email code
-@router.post("/auth/signup/confirm/", status_code=status.HTTP_200_OK, tags=["auth"])
+@router.post("/auth/signup/confirm", status_code=status.HTTP_200_OK, tags=["auth"])
 def confirm_sign_up(
     response: Response,
     signup_confirmation_request: SignupConfirmationRequest,
