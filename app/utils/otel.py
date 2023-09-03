@@ -7,8 +7,8 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 
-api_token = os.getenv("AXIOM_API_TOKEN")
-org_id = os.getenv("AXIOM_ORG_ID")
+api_token = os.environ["AXIOM_API_TOKEN"]
+org_id = os.environ["AXIOM_ORG_ID"]
 
 resource = Resource(
     attributes={"service.name": "backend-srv", "env": os.getenv("ENV", "LOCAL")}

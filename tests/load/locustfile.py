@@ -42,7 +42,8 @@ def get_rand_item_data():
 
 
 class NormalUser(HttpUser):
-    host = "http://0.0.0.0:8000/api/v1"
+    # host = "http://0.0.0.0:8000/api/v1"
+    host = "https://dev.api.terafill.com/api/v1"
     wait_time = between(0.5, 5)
     login_data = {}
     cookies = {}
@@ -201,12 +202,31 @@ class NormalUser(HttpUser):
 
     def on_stop(self):
         from database import SessionLocal, User
+        from app.models.encryption_key import EncryptionKey
+        from app.models.item import Item
+        from app.models.session import Session
+        from app.models.srp_data import SRPData
+        from app.models.key_wrapping_key import KeyWrappingKey
+        from app.models.vault import Vault
+
         db = SessionLocal()
 
         with db.begin():
             try:
                 user = db.query(User).filter(User.email == self.email).first()
                 if user:
+                    user_id = user.id
+                    db.query(Item).filter(Item.creator_id == user_id).delete()
+                    db.query(Vault).filter(Vault.creator_id == user_id).delete()
+                    db.query(EncryptionKey).filter(
+                        EncryptionKey.user_id == user_id
+                    ).delete()
+                    db.query(KeyWrappingKey).filter(
+                        KeyWrappingKey.user_id == user_id
+                    ).delete()
+                    db.query(SRPData).filter(SRPData.user_id == user_id).delete()
+                    db.query(Session).filter(Session.user_id == user_id).delete()
+
                     response = db.delete(user)
                     print(f"User {self.email} deleted successfully.", response)
                     db.commit()

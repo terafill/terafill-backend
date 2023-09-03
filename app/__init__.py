@@ -5,9 +5,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from fastapi.responses import JSONResponse
 
-from . import utils
-from .utils.otel import trace
 
 ENV = os.getenv("ENV", "LOCAL")
 
@@ -32,6 +31,10 @@ from .views import (
     auth,
     icon,
 )
+
+from . import utils
+from .utils.otel import trace
+import app.utils.errors as internal_exceptions
 
 
 app = FastAPI()
@@ -77,10 +80,21 @@ FastAPIInstrumentor.instrument_app(app, tracer_provider=trace.get_tracer_provide
 
 
 @app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
-    # # Now you can create spans
+async def custom_middleware(request: Request, call_next):
     start_time = time.time()
-    response = await call_next(request)
-    end = time.time() - start_time
-    response.headers.append("Server-Timing", f"total;dur={str(end*1000)}")
+
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        # Log the exception for debugging or monitoring purposes
+        print(f"An unexpected error occurred: {e}")
+
+        # Create an HTTP 500 response
+        response = JSONResponse(
+            content={"message": "Internal Server Error"}, status_code=500
+        )
+
+    end_time = time.time() - start_time
+    response.headers["Server-Timing"] = f"total;dur={str(end_time * 1000)}"
+
     return response
