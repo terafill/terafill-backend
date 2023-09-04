@@ -9,9 +9,10 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 api_token = os.environ["AXIOM_API_TOKEN"]
 org_id = os.environ["AXIOM_ORG_ID"]
+env = os.getenv("ENV", "LOCAL")
 
 resource = Resource(
-    attributes={"service.name": "backend-srv", "env": os.getenv("ENV", "LOCAL")}
+    attributes={"service.name": f"backend-srv-{env.lower()}", "env": env}
 )
 
 # Create a TracerProvider and configure it to use the OTLP exporter

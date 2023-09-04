@@ -12,6 +12,7 @@ from locust import HttpUser, task, between, TaskSet
 
 from signup import new_signup
 from login import complete_login
+from config import HOST
 
 
 def get_rand_string(N=10):
@@ -42,8 +43,7 @@ def get_rand_item_data():
 
 
 class NormalUser(HttpUser):
-    # host = "http://0.0.0.0:8000/api/v1"
-    host = "https://dev.api.terafill.com/api/v1"
+    host = f"{HOST}/api/v1"
     wait_time = between(0.5, 5)
     login_data = {}
     cookies = {}
@@ -77,7 +77,12 @@ class NormalUser(HttpUser):
                     cookies=self.user.cookies,
                     name="/users/me/vaults/{vault_id}/items",
                 )
-                self.vault_items[vault["id"]] = response.json()
+                # Check if the status code is 503
+                if response.status_code == 503:
+                    print('Received a 503 Service Unavailable error')
+                    print(response.headers, response.text)
+                else:
+                    self.vault_items[vault["id"]] = response.json()
 
         @task(2)
         def create_vault(self):
@@ -201,7 +206,8 @@ class NormalUser(HttpUser):
         }
 
     def on_stop(self):
-        from database import SessionLocal, User
+        from database import SessionLocal
+        from app.models.user import User
         from app.models.encryption_key import EncryptionKey
         from app.models.item import Item
         from app.models.session import Session

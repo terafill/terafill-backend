@@ -14,7 +14,11 @@ def complete_login(requests, email, password, base_url):
         headers={"client-id": "b980b13c-4db8-4e8a-859c-4544fd70825f"},
     )
 
-    salt = response.json()["salt"]
+    if response.status_code == 503:
+        print("Received a 503 Service Unavailable error")
+        print(response.headers, response.text)
+    else:
+        salt = response.json()["salt"]
 
     # Receive server public and salt and process them.
     client_session = SRPClientSession(SRPContext(email, password))
@@ -36,10 +40,13 @@ def complete_login(requests, email, password, base_url):
     #     login_response.cookies.get("userId"),
     #     login_response.cookies.get("sessionId")
     # , sep="\n")
+    if login_response.status_code == 503:
+        print("login_response: Received a 503 Service Unavailable error")
+        print(login_response.headers, response.text)
+    else:
+        login_response.json()
 
-    login_response.json()
-
-    login_response.raw.getheaders()
+    # login_response.raw.getheaders()
 
     server_public = login_response.json()["serverPublicKey"]
     server_public
@@ -65,7 +72,11 @@ def complete_login(requests, email, password, base_url):
         },
     )
 
-    login_confirm_response.json()
+    if login_confirm_response.status_code == 503:
+        print("login_confirm_response: Received a 503 Service Unavailable error")
+        print(login_confirm_response.headers, response.text)
+    else:
+        login_confirm_response.json()
 
     server_session_key_proof_hash = login_confirm_response.json()["serverProof"]
     server_session_key_proof_hash

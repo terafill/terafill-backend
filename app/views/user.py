@@ -409,12 +409,3 @@ def delete_user(
     if db_user is None:
         raise internal_exceptions.UserNotFoundException()
     crud.delete_user(db=db, db_user=db_user)
-
-import time
-
-@router.get("/client/timeout")
-def client_timeout():
-    time.sleep(5)
-    return {
-        "message": "success"
-    }
