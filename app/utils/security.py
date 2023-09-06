@@ -92,7 +92,7 @@ async def get_current_user(
     sessionToken: Annotated[Union[str, None], Cookie()] = None,
 ):
     with tracer.start_as_current_span("get_current_user"):
-    # print("Axiom, tracing!")
+        # print("Axiom, tracing!")
         user_id = userId
         session_id = sessionId
         session_token = sessionToken
@@ -111,38 +111,36 @@ async def get_current_user(
 
         # Decode the JWE token
         try:
-            # start_time = time.time()
-            db_session = crud.get_session(db, user_id, session_id)
-            # end = time.time() - start_time
-            # response.headers.append("Server-Timing", f"db_get_session;dur={str(end*1000)}")
+            with tracer.start_as_current_span("get_session"):
+                db_session = crud.get_session(db, user_id, session_id)
 
             if db_session:
-                # start_time = time.time()
-                session_details = get_session_details(
-                    session_token, db_session.session_private_key
-                )
-                # end = time.time() - start_time
-                # response.headers.append("Server-Timing", f"compute_get_session_details;dur={str(end*1000)}")
+                # with tracer.start_as_current_span("get_session_details"):
+                #     session_details = get_session_details(
+                #         session_token, db_session.session_private_key
+                #     )
 
-                if session_details["sessionId"] != session_id:
+                if db_session.session_token != session_token:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid Session token.",
+                    )
+
+                if db_session.id != session_id:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Invalid Session token.",
                     )
                 if datetime.utcnow() > db_session.expiry_at or not db_session.activated:
                     # expire active sessions which belong to specific browser/device
-                    # start_time = time.time()
-                    crud.expire_active_sessions(
-                        db,
-                        user_id=session_details["userId"],
-                        client_id=session_details["clientId"],
-                        platform_client_id=session_details["platformClientId"],
-                        session_id=session_id,
-                    )
-                    # end = time.time() - start_time
-                    # response.headers.append(
-                    #     "Server-Timing", f"db_expire_active_sessions;dur={str(end*1000)}"
-                    # )
+                    with tracer.start_as_current_span("expire_active_sessions"):
+                        crud.expire_active_sessions(
+                            db,
+                            user_id=db_session.user_id,
+                            client_id=db_session.client_id,
+                            platform_client_id=db_session.platform_client_id,
+                            session_id=session_id,
+                        )
                     raise HTTPException(
                         status_code=401,
                         detail="Session token is invalid. Token has expired or is inactive.",
@@ -159,8 +157,6 @@ async def get_current_user(
             )
 
         else:
-            # start_time = time.time()
-            current_user = crud.get_user(db, user_id=user_id)
-            # end = time.time() - start_time
-            # response.headers.append("Server-Timing", f"db_get_user;dur={str(end*1000)}")
+            with tracer.start_as_current_span("get_user"):
+                current_user = crud.get_user(db, user_id=user_id)
             return current_user
