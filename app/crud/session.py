@@ -67,9 +67,3 @@ def update_session(
     for field, value in session.dict(exclude_unset=True).items():
         setattr(db_session, field, value)
     return db_session
-
-
-# def delete_master_password(db: Session, db_master_password: schemas.MasterPassword):
-#     db.delete(db_master_password)
-#     db.commit()
-#     return db_master_password

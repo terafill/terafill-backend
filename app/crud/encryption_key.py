@@ -21,24 +21,4 @@ def create_encryption_key(db: Session, encrypted_encryption_key: str, user_id: s
         encrypted_encryption_key=encrypted_encryption_key,
     )
     db.add(db_encryption_key)
-    db.commit()
-    db.refresh(db_encryption_key)
     return db_encryption_key
-
-
-# def update_master_password(
-#     db: Session,
-#     db_master_password: schemas.MasterPassword,
-#     master_password: schemas.MasterPasswordUpdate,
-# ):
-#     for field, value in master_password.dict(exclude_unset=True).items():
-#         setattr(db_master_password, field, value)
-#     db.commit()
-#     db.refresh(db_master_password)
-#     return db_master_password
-
-
-# def delete_master_password(db: Session, db_master_password: schemas.MasterPassword):
-#     db.delete(db_master_password)
-#     db.commit()
-#     return db_master_password

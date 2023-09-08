@@ -531,9 +531,13 @@ def logout(
             response.delete_cookie("sessionId")
             response.delete_cookie("userId")
 
+        db.commit()
+
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         logging.error(f"Something went wrong: {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
 
@@ -616,7 +620,7 @@ def login_refresh(
 
 
 @router.get("/auth/status", status_code=status.HTTP_200_OK, tags=["auth"])
-async def auth_status(
+def auth_status(
     response: Response,
     db: Session = Depends(get_db),
     userId: str = Cookie(),
@@ -627,6 +631,8 @@ async def auth_status(
         user_id = userId
         session_id = sessionId
         session_token = sessionToken
+
+        logged_in = True
 
         db_session = crud.get_session(db, session_id, pruned=True)
 
@@ -647,12 +653,16 @@ async def auth_status(
                 response.delete_cookie("sessionToken")
                 response.delete_cookie("sessionId")
                 response.delete_cookie("userId")
-                return {"loggedIn": False}
+
+                logged_in = False
+
+        db.commit()
+        return {"loggedIn": logged_in}
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         logging.error(f"Something went wrong: {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
-    else:
-        return {"loggedIn": True}

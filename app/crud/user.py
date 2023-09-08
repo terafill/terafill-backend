@@ -54,5 +54,4 @@ def update_user(db: Session, db_user: schemas.User, user: schemas.UserUpdate):
 
 def delete_user(db: Session, db_user: schemas.User):
     db.delete(db_user)
-    db.commit()
     return db_user

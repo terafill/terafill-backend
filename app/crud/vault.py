@@ -41,12 +41,8 @@ def create_vault(db: Session, vault: schemas.VaultCreate, creator_id: str):
 def update_vault(db: Session, db_vault: schemas.Vault, vault: schemas.VaultUpdate):
     for field, value in vault.dict(exclude_unset=True).items():
         setattr(db_vault, field, value)
-    db.commit()
-    db.refresh(db_vault)
     return db_vault
 
 
 def delete_vault(db: Session, db_vault: schemas.Vault):
-    db.delete(db_vault)
-    db.commit()
     return db_vault
