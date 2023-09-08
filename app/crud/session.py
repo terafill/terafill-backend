@@ -11,6 +11,7 @@ def get_session(db: Session, session_id: str, pruned=False):
             db.query(models.Session)
             .filter(models.Session.id == session_id)
             .with_entities(
+                models.Session.id,
                 models.Session.client_id,
                 models.Session.platform_client_id,
                 models.Session.expiry_at,
@@ -22,7 +23,6 @@ def get_session(db: Session, session_id: str, pruned=False):
         )
     return (
         db.query(models.Session)
-        # .filter(models.Session.user_id == user_id)
         .filter(models.Session.id == session_id).first()
     )
 
@@ -44,8 +44,6 @@ def create_session(db: Session, session: schemas.Session):
         expiry_at=expiry_at,
     )
     db.add(db_session)
-    db.commit()
-    db.refresh(db_session)
     return db_session
 
 
@@ -59,7 +57,6 @@ def expire_active_sessions(
         models.Session.platform_client_id == platform_client_id,
         models.Session.id != session_id,
     ).delete()
-    db.commit()
 
 
 def update_session(
@@ -69,8 +66,6 @@ def update_session(
 ):
     for field, value in session.dict(exclude_unset=True).items():
         setattr(db_session, field, value)
-    db.commit()
-    db.refresh(db_session)
     return db_session
 
 

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -9,18 +10,18 @@ def get_vault(db: Session, vault_id: str):
     return db.query(models.Vault).filter(models.Vault.id == vault_id).first()
 
 
-# def get_user_by_email(db: Session, email: str):
-#     return db.query(models.User).filter(models.User.email == email).first()
-
-
 def get_vaults(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Vault).offset(skip).limit(limit).all()
 
 
 def get_vaults_by_user_id(db: Session, user_id: str, skip: int = 0, limit: int = 100):
-    return db.query(models.Vault)\
-        .filter(models.Vault.creator_id == user_id)\
-        .offset(skip).limit(limit).all()
+    return (
+        db.query(models.Vault)
+        .filter(models.Vault.creator_id == user_id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 def create_vault(db: Session, vault: schemas.VaultCreate, creator_id: str):
@@ -31,10 +32,9 @@ def create_vault(db: Session, vault: schemas.VaultCreate, creator_id: str):
         creator_id=creator_id,
         id=vault_id,
         is_default=vault.is_default,
+        created_at=datetime.utcnow()
     )
     db.add(db_vault)
-    db.commit()
-    db.refresh(db_vault)
     return db_vault
 
 

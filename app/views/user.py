@@ -93,7 +93,13 @@ def create_vault(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    return crud.create_vault(db=db, vault=vault, creator_id=current_user.id)
+    try:
+        vault = crud.create_vault(db=db, vault=vault, creator_id=current_user.id)
+        db.commit()
+        return vault
+    except Exception as e:
+        db.rollback()
+        raise internal_exceptions.InternalServerException()
 
 
 @router.get(

@@ -15,7 +15,9 @@ def get_user_profile_image(db: Session, user_id: str):
     return db_user.profile_image
 
 
-def get_user_by_email(db: Session, email: str):
+def get_user_by_email(db: Session, email: str, fields: list = None):
+    if fields:
+        return db.query(*fields).filter(models.User.email == email).first()
     return db.query(models.User).filter(models.User.email == email).first()
 
 
@@ -42,15 +44,12 @@ def create_user(db: Session, user: schemas.UserCreate):
         status=user.status,
     )
     db.add(db_user)
-    db.commit()
-    # db.refresh(db_user)
     return db_user
 
 
 def update_user(db: Session, db_user: schemas.User, user: schemas.UserUpdate):
     for field, value in user.dict(exclude_unset=True).items():
         setattr(db_user, field, value)
-    db.commit()
 
 
 def delete_user(db: Session, db_user: schemas.User):

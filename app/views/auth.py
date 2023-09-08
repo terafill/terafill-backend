@@ -20,7 +20,7 @@ from srptools import SRPServerSession, SRPContext, constants
 
 import app.utils.errors as internal_exceptions
 from app.utils.schema_helpers import to_lower_camel_case
-from .. import schemas, crud
+from .. import schemas, crud, models
 from ..database import get_db
 from ..utils.errors import ErrorCodes
 from ..utils.security import (
@@ -131,12 +131,18 @@ def signup(
 
         elif user_type == "deactivated":
             raise internal_exceptions.EmailDeactivatedException()
+
+        db.commit()
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         print(f"Something went wrong {e}")
         logging.error(f"Something went wrong {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
+    finally:
+        db.close()
 
 
 class SignupConfirmationRequest(BaseModel):  # Model for email verification code request
@@ -165,7 +171,6 @@ def confirm_sign_up(
     try:
         email = signup_confirmation_request.email
         verification_code = signup_confirmation_request.verification_code
-        # mpesk = signup_confirmation_request.mpesk
         first_name = signup_confirmation_request.first_name
         last_name = signup_confirmation_request.last_name
         verifier = signup_confirmation_request.verifier
@@ -197,15 +202,8 @@ def confirm_sign_up(
             user_id=user_id,
         )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise internal_exceptions.InternalServerException()
-    else:
         # Create deafult vault
         vault = schemas.VaultCreate(name="Default Vault", is_default=True)
-
         db_vault = crud.create_vault(db, vault, creator_id=user_id)
 
         # logging.error(f"created vault {user_id}", db_vault)
@@ -218,7 +216,14 @@ def confirm_sign_up(
         # )
         # crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
 
-        return {}
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Something went wrong: {e}", exc_info=True)
+        raise internal_exceptions.InternalServerException()
 
 
 def build_session(
@@ -281,13 +286,12 @@ def get_salt(
         email = login_request.email
 
         # Get user details
-        db_user = crud.get_user_by_email(db, email)
+        db_user = crud.get_user_by_email(db, email, fields=[models.User.id])
         if db_user is None:
             raise internal_exceptions.UserNotFoundException()
         user_id = db_user.id
 
-        db_srp_data = crud.get_srp_data(db, user_id)
-
+        db_srp_data = crud.get_srp_data(db, user_id, fields=[models.SRPData.salt])
         salt = db_srp_data.salt
 
     except HTTPException:
@@ -321,7 +325,7 @@ def login(
         client_public_key = login_request.client_public_key
 
         # Get user details
-        db_user = crud.get_user_by_email(db, email)
+        db_user = crud.get_user_by_email(db, email, fields=[models.User.id])
         if db_user is None:
             raise internal_exceptions.UserNotFoundException()
         user_id = db_user.id
@@ -346,12 +350,6 @@ def login(
             client_public_key, salt
         )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise internal_exceptions.InternalServerException()
-    else:
         # generate session
         session_details = build_session(
             db,
@@ -388,6 +386,9 @@ def login(
             secure=True,
             samesite="none",
         )
+
+        db.commit()
+
         return {
             "salt": salt,
             "serverPublicKey": server_public_key,
@@ -395,6 +396,14 @@ def login(
             "platformClientId": session_details["platformClientId"],
             "userId": user_id,
         }
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Something went wrong: {e}", exc_info=True)
+        raise internal_exceptions.InternalServerException()
 
 
 class LoginConfirmationRequest(BaseModel):
@@ -422,7 +431,7 @@ def login_confirm(
         client_proof = login_request.client_proof
 
         # Get user details
-        db_user = crud.get_user_by_email(db, email)
+        db_user = crud.get_user_by_email(db, email, fields=[models.User.id])
         if db_user is None:
             raise internal_exceptions.UserNotFoundException()
         user_id = db_user.id
@@ -451,12 +460,6 @@ def login_confirm(
         else:
             raise internal_exceptions.SessionNotFoundException()
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Something went wrong: {e}", exc_info=True)
-        raise internal_exceptions.InternalServerException()
-    else:
         key_wrapping_key = crud.get_key_wrapping_key(
             db, user_id=user_id
         ).encrypted_private_key
@@ -478,11 +481,19 @@ def login_confirm(
             secure=True,
             samesite="none",
         )
+        db.commit()
         return {
             "serverProof": server_key_proof,
             "keyWrappingKey": key_wrapping_key,
             "sessionToken": db_session.session_token,
         }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Something went wrong: {e}", exc_info=True)
+        raise internal_exceptions.InternalServerException()
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
@@ -617,7 +628,7 @@ async def auth_status(
         session_id = sessionId
         session_token = sessionToken
 
-        db_session = crud.get_session(db, session_id)
+        db_session = crud.get_session(db, session_id, pruned=True)
 
         if db_session:
             if db_session.id != session_id:

@@ -17,8 +17,6 @@ def create_key_wrapping_key(db: Session, encrypted_key_wrapping_key: str, user_i
         encrypted_private_key=encrypted_key_wrapping_key,
     )
     db.add(db_key_wrapping_key)
-    db.commit()
-    db.refresh(db_key_wrapping_key)
     return db_key_wrapping_key
 
 
