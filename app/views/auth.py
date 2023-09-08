@@ -97,15 +97,12 @@ def signup(
     try:
         email = signup_request.email
         user_type = None
-
-        with tracer.start_as_current_span("signup.get_user_by_email"):
-            user = crud.get_user_by_email(db, email)
+        user = crud.get_user_by_email(db, email)
         if not user:  # new user
             user_data = schemas.UserCreate(
                 email=email, status="unconfirmed", first_name="", last_name=""
             )
-            with tracer.start_as_current_span("signup.create_user"):
-                user = crud.create_user(db, user_data)
+            user = crud.create_user(db, user_data)
             user_type = "new"
         else:
             user_type = user.status
@@ -127,8 +124,7 @@ def signup(
                 email_verification_code=verification_code,
                 status="unconfirmed",
             )
-            with tracer.start_as_current_span("signup.update_user"):
-                crud.update_user(db=db, db_user=user, user=updated_user)
+            crud.update_user(db=db, db_user=user, user=updated_user)
 
         elif user_type == "confirmed":
             raise internal_exceptions.EmailAlreadyRegisteredException()
@@ -178,8 +174,7 @@ def confirm_sign_up(
             signup_confirmation_request.encrypted_key_wrapping_key
         )
 
-        with tracer.start_as_current_span("signup.confirm.get_user_by_email"):
-            user = crud.get_user_by_email(db, email)
+        user = crud.get_user_by_email(db, email)
 
         if str(user.email_verification_code) != str(verification_code):  # verify email
             raise internal_exceptions.InvalidVerificationCodeException()
@@ -190,23 +185,17 @@ def confirm_sign_up(
         updated_user = schemas.UserUpdate(
             first_name=first_name, last_name=last_name, status="confirmed"
         )
-        with tracer.start_as_current_span("signup.confirm.update_user"):
-            crud.update_user(db=db, db_user=user, user=updated_user)
+        crud.update_user(db=db, db_user=user, user=updated_user)
 
-        # # Store MPESK
-        # crud.create_mpesk(db, mpesk=mpesk, user_id=user_id)
+        # Store salt and verifier
+        crud.create_srp_data(db, salt=salt, verifier=verifier, user_id=user_id)
 
-        with tracer.start_as_current_span("signup.confirm.create_srp_data"):
-            # Store salt and verifier
-            crud.create_srp_data(db, salt=salt, verifier=verifier, user_id=user_id)
-
-        with tracer.start_as_current_span("signup.confirm.create_key_wrapping_key"):
-            # Store salt and verifier
-            crud.create_key_wrapping_key(
-                db,
-                encrypted_key_wrapping_key=encrypted_key_wrapping_key,
-                user_id=user_id,
-            )
+        # Store salt and verifier
+        crud.create_key_wrapping_key(
+            db,
+            encrypted_key_wrapping_key=encrypted_key_wrapping_key,
+            user_id=user_id,
+        )
 
     except HTTPException:
         raise
@@ -217,8 +206,7 @@ def confirm_sign_up(
         # Create deafult vault
         vault = schemas.VaultCreate(name="Default Vault", is_default=True)
 
-        with tracer.start_as_current_span("signup.confirm.create_vault"):
-            db_vault = crud.create_vault(db, vault, creator_id=user_id)
+        db_vault = crud.create_vault(db, vault, creator_id=user_id)
 
         # logging.error(f"created vault {user_id}", db_vault)
 
@@ -248,30 +236,27 @@ def build_session(
 
     session_id = str(uuid.uuid4())
 
-    with tracer.start_as_current_span("login.get_session_private_key"):
-        if session_private_key is None:
-            session_private_key = get_session_private_key()
+    if session_private_key is None:
+        session_private_key = get_session_private_key()
 
-    with tracer.start_as_current_span("login.get_session_token"):
-        session_token = get_session_token(
-            user_id, session_id, client_id, platform_client_id, session_private_key
-        )
+    session_token = get_session_token(
+        user_id, session_id, client_id, platform_client_id, session_private_key
+    )
 
-    with tracer.start_as_current_span("login.SessionCreate_and_create_session"):
-        # Update user status and profile data
-        session = schemas.SessionCreate(
-            id=session_id,
-            user_id=user_id,
-            session_private_key=session_private_key,
-            session_token=session_token,
-            client_id=client_id,
-            platform_client_id=platform_client_id,
-            activated=False,
-            session_encryption_key=session_encryption_key,
-            session_srp_server_private_key=session_srp_server_private_key,
-            session_srp_client_public_key=session_srp_client_public_key,
-        )
-        crud.create_session(db=db, session=session)
+    # Update user status and profile data
+    session = schemas.SessionCreate(
+        id=session_id,
+        user_id=user_id,
+        session_private_key=session_private_key,
+        session_token=session_token,
+        client_id=client_id,
+        platform_client_id=platform_client_id,
+        activated=False,
+        session_encryption_key=session_encryption_key,
+        session_srp_server_private_key=session_srp_server_private_key,
+        session_srp_client_public_key=session_srp_client_public_key,
+    )
+    crud.create_session(db=db, session=session)
 
     return {
         "sessionId": session_id,
@@ -335,35 +320,31 @@ def login(
         email = login_request.email
         client_public_key = login_request.client_public_key
 
-        with tracer.start_as_current_span("login.get_user_by_email"):
-            # Get user details
-            db_user = crud.get_user_by_email(db, email)
-            if db_user is None:
-                raise internal_exceptions.UserNotFoundException()
+        # Get user details
+        db_user = crud.get_user_by_email(db, email)
+        if db_user is None:
+            raise internal_exceptions.UserNotFoundException()
         user_id = db_user.id
 
-        with tracer.start_as_current_span("login.get_srp_data"):
-            db_srp_data = crud.get_srp_data(db, user_id)
+        db_srp_data = crud.get_srp_data(db, user_id)
 
         verifier = db_srp_data.verifier
         salt = db_srp_data.salt
 
-        with tracer.start_as_current_span("login.SRPServerSession"):
-            server = SRPServerSession(
-                SRPContext(
-                    username=email,
-                    prime=constants.PRIME_1024,
-                    generator=constants.PRIME_1024_GEN,
-                ),
-                verifier,
-            )
+        server = SRPServerSession(
+            SRPContext(
+                username=email,
+                prime=constants.PRIME_1024,
+                generator=constants.PRIME_1024_GEN,
+            ),
+            verifier,
+        )
 
         server_public_key = server.public
 
-        with tracer.start_as_current_span("login.server.process"):
-            session_key, client_key_proof, server_key_proof = server.process(
-                client_public_key, salt
-            )
+        session_key, client_key_proof, server_key_proof = server.process(
+            client_public_key, salt
+        )
 
     except HTTPException:
         raise
@@ -371,17 +352,16 @@ def login(
         logging.error(f"Something went wrong: {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
     else:
-        with tracer.start_as_current_span("login.build_session"):
-            # generate session
-            session_details = build_session(
-                db,
-                user_id=user_id,
-                client_id=client_id,
-                platform_client_id=platform_client_id,
-                session_encryption_key=session_key,
-                session_srp_client_public_key=client_public_key,
-                session_srp_server_private_key=server.private,
-            )
+        # generate session
+        session_details = build_session(
+            db,
+            user_id=user_id,
+            client_id=client_id,
+            platform_client_id=platform_client_id,
+            session_encryption_key=session_key,
+            session_srp_client_public_key=client_public_key,
+            session_srp_server_private_key=server.private,
+        )
 
         # Set cookies with httpOnly flag set to true
         response.set_cookie(
@@ -441,40 +421,30 @@ def login_confirm(
         email = login_request.email
         client_proof = login_request.client_proof
 
-        with tracer.start_as_current_span("login.confirm.get_user_by_email"):
-            # Get user details
-            db_user = crud.get_user_by_email(db, email)
-            if db_user is None:
-                raise internal_exceptions.UserNotFoundException()
+        # Get user details
+        db_user = crud.get_user_by_email(db, email)
+        if db_user is None:
+            raise internal_exceptions.UserNotFoundException()
         user_id = db_user.id
 
-        with tracer.start_as_current_span("login.confirm.get_session"):
-            db_session = crud.get_session(db, user_id, session_id)
+        db_session = crud.get_session(db, session_id)
 
         if db_session:
-            with tracer.start_as_current_span("login.confirm.get_srp_data"):
-                db_srp_data = crud.get_srp_data(db, user_id)
+            db_srp_data = crud.get_srp_data(db, user_id)
 
-            with tracer.start_as_current_span("login.confirm.SRPServerSession"):
-                server = SRPServerSession(
-                    SRPContext(
-                        username=email,
-                        prime=constants.PRIME_1024,
-                        generator=constants.PRIME_1024_GEN,
-                    ),
-                    db_srp_data.verifier,
-                    db_session.session_srp_server_private_key,
-                )
+            server = SRPServerSession(
+                SRPContext(
+                    username=email,
+                    prime=constants.PRIME_1024,
+                    generator=constants.PRIME_1024_GEN,
+                ),
+                db_srp_data.verifier,
+                db_session.session_srp_server_private_key,
+            )
 
-            with tracer.start_as_current_span("login.confirm.server.process"):
-                session_key, client_key_proof, server_key_proof = server.process(
-                    db_session.session_srp_client_public_key, db_srp_data.salt
-                )
-
-            # with tracer.start_as_current_span("login.confirm.get_session_details"):
-            #     session_details = get_session_details(
-            #         db_session.session_token, db_session.session_private_key
-            #     )
+            session_key, client_key_proof, server_key_proof = server.process(
+                db_session.session_srp_client_public_key, db_srp_data.salt
+            )
 
             if client_key_proof.decode() != client_proof:
                 raise internal_exceptions.InvalidClientProofException()
@@ -487,23 +457,18 @@ def login_confirm(
         logging.error(f"Something went wrong: {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
     else:
-        with tracer.start_as_current_span("login.confirm.get_key_wrapping_key"):
-            key_wrapping_key = crud.get_key_wrapping_key(
-                db, user_id=user_id
-            ).encrypted_private_key
+        key_wrapping_key = crud.get_key_wrapping_key(
+            db, user_id=user_id
+        ).encrypted_private_key
 
-        with tracer.start_as_current_span("login.confirm.expire_active_sessions"):
-            # expire active sessions
-            crud.expire_active_sessions(
-                db, user_id, client_id, platform_client_id, session_id
-            )
+        # expire active sessions
+        crud.expire_active_sessions(
+            db, user_id, client_id, platform_client_id, session_id
+        )
 
-        with tracer.start_as_current_span("login.confirm.update_session"):
-            # Activate session
-            session = schemas.SessionUpdate(
-                id=session_id, user_id=user_id, activated=True
-            )
-            crud.update_session(db, db_session, session)
+        # Activate session
+        session = schemas.SessionUpdate(id=session_id, user_id=user_id, activated=True)
+        crud.update_session(db, db_session, session)
 
         response.set_cookie(
             key="sessionToken",
@@ -533,7 +498,7 @@ def logout(
         session_id = sessionId
         session_token = sessionToken
 
-        db_session = crud.get_session(db, user_id, session_id)
+        db_session = crud.get_session(db, session_id)
 
         if db_session:
             session_details = get_session_details(
@@ -591,7 +556,7 @@ def login_refresh(
         #         detail="Incorrect username or password.",
         #     )
 
-        db_session = crud.get_session(db, user_id, session_id)
+        db_session = crud.get_session(db, session_id)
 
         if db_session:
             session_details = get_session_details(
@@ -652,13 +617,9 @@ async def auth_status(
         session_id = sessionId
         session_token = sessionToken
 
-        with tracer.start_as_current_span("get_session"):
-            db_session = crud.get_session(db, user_id, session_id)
+        db_session = crud.get_session(db, session_id)
 
         if db_session:
-            # session_details = get_session_details(
-            #     session_token, db_session.session_private_key
-            # )
             if db_session.id != session_id:
                 raise internal_exceptions.InvalidSessionException()
 

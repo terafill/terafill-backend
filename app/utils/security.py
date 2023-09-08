@@ -129,7 +129,6 @@ async def get_current_user(
     sessionToken: Annotated[Union[str, None], Cookie()] = None,
 ):
     with tracer.start_as_current_span("get_current_user"):
-        # print("Axiom, tracing!")
         user_id = userId
         session_id = sessionId
         session_token = sessionToken
@@ -148,36 +147,23 @@ async def get_current_user(
 
         # Decode the JWE token
         try:
-            with tracer.start_as_current_span("get_session"):
-                db_session = crud.get_session(db, user_id, session_id)
-
+            db_session = crud.get_session(db, session_id, pruned=True)
             if db_session:
-                # with tracer.start_as_current_span("get_session_details"):
-                #     session_details = get_session_details(
-                #         session_token, db_session.session_private_key
-                #     )
-
-                if db_session.session_token != session_token:
+                if db_session.session_token != session_token or db_session.user_id != user_id:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Invalid Session token.",
                     )
 
-                if db_session.id != session_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid Session token.",
-                    )
                 if datetime.utcnow() > db_session.expiry_at or not db_session.activated:
                     # expire active sessions which belong to specific browser/device
-                    with tracer.start_as_current_span("expire_active_sessions"):
-                        crud.expire_active_sessions(
-                            db,
-                            user_id=db_session.user_id,
-                            client_id=db_session.client_id,
-                            platform_client_id=db_session.platform_client_id,
-                            session_id=session_id,
-                        )
+                    crud.expire_active_sessions(
+                        db,
+                        user_id=db_session.user_id,
+                        client_id=db_session.client_id,
+                        platform_client_id=db_session.platform_client_id,
+                        session_id=session_id,
+                    )
                     raise HTTPException(
                         status_code=401,
                         detail="Session token is invalid. Token has expired or is inactive.",
@@ -193,6 +179,5 @@ async def get_current_user(
                 detail=f"Invalid authentication credentials: {e}",
             )
         else:
-            with tracer.start_as_current_span("get_user"):
-                current_user = crud.get_user(db, user_id=user_id)
+            current_user = crud.get_user(db, user_id=user_id)
             return current_user

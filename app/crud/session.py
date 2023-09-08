@@ -5,16 +5,25 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 
 
-def get_session(
-    db: Session,
-    user_id: str,
-    session_id: str
-):
+def get_session(db: Session, session_id: str, pruned=False):
+    if pruned:
+        return (
+            db.query(models.Session)
+            .filter(models.Session.id == session_id)
+            .with_entities(
+                models.Session.client_id,
+                models.Session.platform_client_id,
+                models.Session.expiry_at,
+                models.Session.session_token,
+                models.Session.user_id,
+                models.Session.activated,
+            )
+            .first()
+        )
     return (
         db.query(models.Session)
-        .filter(models.Session.user_id == user_id)
-        .filter(models.Session.id == session_id)
-        .first()
+        # .filter(models.Session.user_id == user_id)
+        .filter(models.Session.id == session_id).first()
     )
 
 
@@ -41,11 +50,8 @@ def create_session(db: Session, session: schemas.Session):
 
 
 def expire_active_sessions(
-    db: Session,
-    user_id: str,
-    client_id: str,
-    platform_client_id: str,
-    session_id: str):
+    db: Session, user_id: str, client_id: str, platform_client_id: str, session_id: str
+):
     # Delete all sessions that match the given criteria
     db.query(models.Session).filter(
         models.Session.user_id == user_id,
@@ -54,6 +60,7 @@ def expire_active_sessions(
         models.Session.id != session_id,
     ).delete()
     db.commit()
+
 
 def update_session(
     db: Session,

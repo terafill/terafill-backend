@@ -44,7 +44,7 @@ def get_rand_item_data():
 
 class NormalUser(HttpUser):
     host = f"{HOST}/api/v1"
-    wait_time = between(0.5, 5)
+    wait_time = between(1, 5)
     login_data = {}
     cookies = {}
     email = ""
