@@ -8,7 +8,13 @@ ca_path = "/etc/ssl/certs/ca-certificates.crt"
 ssl_args = {"ssl_ca": ca_path}
 
 engine = create_engine(
-    DATABASE_URL, echo=False, query_cache_size=0, connect_args=ssl_args
+    DATABASE_URL,
+    echo=False,
+    query_cache_size=0,
+    connect_args=ssl_args,
+    pool_timeout=10,
+    pool_size=120,
+    max_overflow=60,
 )
 
 

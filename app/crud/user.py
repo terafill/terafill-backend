@@ -52,6 +52,15 @@ def update_user(db: Session, db_user: schemas.User, user: schemas.UserUpdate):
         setattr(db_user, field, value)
 
 
-def delete_user(db: Session, db_user: schemas.User):
-    db.delete(db_user)
-    return db_user
+def delete_user(db: Session, user_id: str):
+    # db.query(models.Item).filter(models.Item.creator_id == user_id).delete()
+    # db.query(models.Vault).filter(models.Vault.creator_id == user_id).delete()
+    # db.query(models.EncryptionKey).filter(
+    #     models.EncryptionKey.user_id == user_id
+    # ).delete()
+    # db.query(models.KeyWrappingKey).filter(
+    #     models.KeyWrappingKey.user_id == user_id
+    # ).delete()
+    # db.query(models.SRPData).filter(models.SRPData.user_id == user_id).delete()
+    # db.query(models.Session).filter(models.Session.user_id == user_id).delete()
+    db.query(models.User).filter(models.User.id == user_id).delete()

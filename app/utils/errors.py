@@ -13,6 +13,7 @@ class ErrorCodes(Enum):
     SESSION_NOT_FOUND = 1006
     INVALID_SESSION = 1007
     ITEM_NOT_FOUND = 1008
+    INVALID_USER_DELETION = 1009
 
 
 class InternalServerException(HTTPException):
@@ -189,6 +190,26 @@ class ItemNotFoundException(HTTPException):
             detail={
                 "error": "ITEM_NOT_FOUND",
                 "code": ErrorCodes.ITEM_NOT_FOUND.value,
+                "info": message,
+            },
+            headers=headers,
+        )
+
+
+class InvalidUserDeletionRequestException(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_401_UNAUTHORIZED,
+        message: Optional[str] = None,
+        headers: Optional[dict] = None,
+    ):
+        if not message:
+            message = "User deletion not allowed in this environment."
+        super().__init__(
+            status_code,
+            detail={
+                "error": "INVALID_USER_DELETION",
+                "code": ErrorCodes.INVALID_USER_DELETION.value,
                 "info": message,
             },
             headers=headers,

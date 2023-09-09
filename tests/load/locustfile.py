@@ -79,7 +79,7 @@ class NormalUser(HttpUser):
                 )
                 # Check if the status code is 503
                 if response.status_code == 503:
-                    print('Received a 503 Service Unavailable error')
+                    print("Received a 503 Service Unavailable error")
                     print(response.headers, response.text)
                 else:
                     self.vault_items[vault["id"]] = response.json()
@@ -214,7 +214,8 @@ class NormalUser(HttpUser):
         from app.models.srp_data import SRPData
         from app.models.key_wrapping_key import KeyWrappingKey
         from app.models.vault import Vault
-
+        
+        time.sleep(1)
         db = SessionLocal()
 
         with db.begin():
@@ -222,20 +223,16 @@ class NormalUser(HttpUser):
                 user = db.query(User).filter(User.email == self.email).first()
                 if user:
                     user_id = user.id
-                    db.query(Item).filter(Item.creator_id == user_id).delete()
-                    db.query(Vault).filter(Vault.creator_id == user_id).delete()
-                    db.query(EncryptionKey).filter(
-                        EncryptionKey.user_id == user_id
-                    ).delete()
-                    db.query(KeyWrappingKey).filter(
-                        KeyWrappingKey.user_id == user_id
-                    ).delete()
-                    db.query(SRPData).filter(SRPData.user_id == user_id).delete()
-                    db.query(Session).filter(Session.user_id == user_id).delete()
-
-                    response = db.delete(user)
-                    print(f"User {self.email} deleted successfully.", response)
-                    db.commit()
+                    response = self.client.delete(
+                        self.host + f"/users/{user_id}",
+                        cookies=self.cookies,
+                        name="/users/{user_id}",
+                    )
+                    if response.status_code == 204:
+                        print(f"User {self.email} deleted successfully.", response)
+                    else:
+                        print(response.text)
+                        print(f"User {self.email} deletion failed.", response)
                 else:
                     print("User not found")
             except Exception as e:

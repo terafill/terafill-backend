@@ -1,4 +1,5 @@
 import base64
+import logging
 from typing import List, Annotated, Union
 
 from fastapi import (
@@ -19,6 +20,7 @@ import app.utils.errors as internal_exceptions
 from .. import models, schemas, crud
 from ..utils.security import get_current_user
 from ..database import get_db
+from ..config import ENV
 
 
 router = APIRouter(dependencies=[], tags=["user"])
@@ -413,13 +415,22 @@ def delete_item(
 #     return crud.update_user(db=db, db_user=db_user, user=user)
 
 
-# @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-# def delete_user(
-#     user_id: str,
-#     db: Session = Depends(get_db),
-#     current_user: models.User = Depends(get_current_user),
-# ):
-#     db_user = crud.get_user(db, user_id=user_id)
-#     if db_user is None:
-#         raise internal_exceptions.UserNotFoundException()
-#     crud.delete_user(db=db, db_user=db_user)
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    try:
+        if ENV != "LOCAL":
+            raise internal_exceptions.InvalidUserDeletionRequestException()
+        user_id = current_user.id
+        crud.delete_user(db=db, user_id=user_id)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        logging.error(f"Error occurred: {e}", exc_info=True)
+        db.rollback()
+        raise internal_exceptions.InternalServerException()

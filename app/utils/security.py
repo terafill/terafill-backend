@@ -132,58 +132,59 @@ def get_current_user(
     sessionId: Annotated[Union[str, None], Cookie()] = None,
     sessionToken: Annotated[Union[str, None], Cookie()] = None,
 ):
-    with tracer.start_as_current_span("get_current_user"):
-        user_id = userId
-        session_id = sessionId
-        session_token = sessionToken
+    user_id = userId
+    session_id = sessionId
+    session_token = sessionToken
 
-        # Check if the user-id was provided
-        if not user_id:
-            raise HTTPException(status_code=401, detail="User Id missing")
+    # Check if the user-id was provided
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User Id missing")
 
-        # Check if the session-id was provided
-        if not session_id:
-            raise HTTPException(status_code=401, detail="Session Id missing")
+    # Check if the session-id was provided
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Session Id missing")
 
-        # Check if the session token was provided
-        if not session_token:
-            raise HTTPException(status_code=401, detail="Session token missing")
+    # Check if the session token was provided
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Session token missing")
 
-        # Decode the JWE token
-        try:
-            db_session = crud.get_session(db, session_id, pruned=True)
-            if db_session:
-                if db_session.session_token != session_token or db_session.user_id != user_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid Session token.",
-                    )
+    # Decode the JWE token
+    try:
+        db_session = crud.get_session(db, session_id, pruned=True)
+        if db_session:
+            if (
+                db_session.session_token != session_token
+                or db_session.user_id != user_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid Session token.",
+                )
 
-                if datetime.utcnow() > db_session.expiry_at or not db_session.activated:
-                    # expire active sessions which belong to specific browser/device
-                    crud.expire_active_sessions(
-                        db,
-                        user_id=db_session.user_id,
-                        client_id=db_session.client_id,
-                        platform_client_id=db_session.platform_client_id,
-                        session_id=session_id,
-                    )
-                    db.commit()
-                    raise HTTPException(
-                        status_code=401,
-                        detail="Session token is invalid. Token has expired or is inactive.",
-                    )
-            return CurrentUser(id=user_id)
-        except HTTPException:
-            db.rollback()
-            raise
-        except Exception as e:
-            db.rollback()
-            logging.error(f"Invalid authentication credentials: {e}", exc_info=True)
+            if datetime.utcnow() > db_session.expiry_at or not db_session.activated:
+                # expire active sessions which belong to specific browser/device
+                crud.expire_active_sessions(
+                    db,
+                    user_id=db_session.user_id,
+                    client_id=db_session.client_id,
+                    platform_client_id=db_session.platform_client_id,
+                    session_id=session_id,
+                )
+                db.commit()
+                raise HTTPException(
+                    status_code=401,
+                    detail="Session token is invalid. Token has expired or is inactive.",
+                )
+        return CurrentUser(id=user_id)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Invalid authentication credentials: {e}", exc_info=True)
 
-            # Raise an HTTPException if the token is invalid
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid authentication credentials: {e}",
-            )
-
+        # Raise an HTTPException if the token is invalid
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid authentication credentials: {e}",
+        )
