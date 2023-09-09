@@ -6,7 +6,7 @@ from typing import Annotated, Union
 
 from fastapi import Depends, HTTPException, status, Request, Cookie, Response
 from sqlalchemy.orm import Session
-
+from pydantic import BaseModel, UUID4
 
 from cryptography.hazmat.primitives import serialization
 
@@ -119,8 +119,12 @@ def get_session_details(session_token, session_private_key):
     return session_details
 
 
+class CurrentUser(BaseModel):
+    id: UUID4
+
+
 # Dependency to get the current user from the JWT access token
-async def get_current_user(
+def get_current_user(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
@@ -164,13 +168,17 @@ async def get_current_user(
                         platform_client_id=db_session.platform_client_id,
                         session_id=session_id,
                     )
+                    db.commit()
                     raise HTTPException(
                         status_code=401,
                         detail="Session token is invalid. Token has expired or is inactive.",
                     )
+            return CurrentUser(id=user_id)
         except HTTPException:
+            db.rollback()
             raise
         except Exception as e:
+            db.rollback()
             logging.error(f"Invalid authentication credentials: {e}", exc_info=True)
 
             # Raise an HTTPException if the token is invalid
@@ -178,6 +186,4 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid authentication credentials: {e}",
             )
-        else:
-            current_user = crud.get_user(db, user_id=user_id)
-            return current_user
+

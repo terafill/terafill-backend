@@ -138,7 +138,6 @@ def fetch_image(url: str):
 def read_vault(
     vault_id: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
 ):
     try:
         vault = crud.get_vault(db, vault_id=vault_id)
@@ -183,7 +182,6 @@ def update_vault(
     vault_id: str,
     vault: schemas.VaultUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
 ):
     try:
         db_vault = crud.get_vault(db, vault_id=vault_id)
@@ -206,7 +204,6 @@ def update_vault(
 def delete_vault(
     vault_id: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
 ):
     try:
         db_vault = crud.get_vault(db, vault_id=vault_id)
