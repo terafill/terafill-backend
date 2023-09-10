@@ -1,7 +1,7 @@
 CREATE TABLE `key_wrapping_keys` (
-	`user_id` varchar(128) NOT NULL,
-	`public_key` text,
-	`encrypted_private_key` text NOT NULL,
+	`user_id` char(36) NOT NULL,
+	`public_key` varchar(4096),
+	`encrypted_private_key` varchar(4096) NOT NULL,
 	PRIMARY KEY (`user_id`)
 ) ENGINE InnoDB,
 CHARSET utf8mb4,

@@ -25,7 +25,6 @@ class ItemBase(BaseModel):
     password: Optional[str] = None
     website: Optional[str] = None
     tags: Optional[List[str]] = None
-    notes: Optional[str] = None
     type: Optional[ItemType] = None
     encrypted_encryption_key: Optional[str] = None
 
@@ -46,7 +45,7 @@ class ItemUpdate(ItemBase):
 
 class Item(ItemBase):
     id: UUID4
-    creator_id: UUID4
+    user_id: UUID4
     created_at: datetime
     vault_id: UUID4
     # model_config = ConfigDict(from_attributes=True)

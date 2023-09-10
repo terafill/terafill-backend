@@ -29,6 +29,6 @@ class VaultUpdate(VaultBase):
 
 class Vault(VaultBase):
     id: UUID4
-    creator_id: UUID4
+    user_id: UUID4
     created_at: datetime
     # model_config = ConfigDict(from_attributes=True)

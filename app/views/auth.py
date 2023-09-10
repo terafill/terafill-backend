@@ -99,9 +99,7 @@ def signup(
         user_type = None
         user = crud.get_user_by_email(db, email)
         if not user:  # new user
-            user_data = schemas.UserCreate(
-                email=email, status="unconfirmed", first_name="", last_name=""
-            )
+            user_data = schemas.UserCreate(email=email, status="unconfirmed")
             user = crud.create_user(db, user_data)
             user_type = "new"
         else:
@@ -141,8 +139,6 @@ def signup(
         print(f"Something went wrong {e}")
         logging.error(f"Something went wrong {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
-    finally:
-        db.close()
 
 
 class SignupConfirmationRequest(BaseModel):  # Model for email verification code request
@@ -171,8 +167,6 @@ def confirm_sign_up(
     try:
         email = signup_confirmation_request.email
         verification_code = signup_confirmation_request.verification_code
-        first_name = signup_confirmation_request.first_name
-        last_name = signup_confirmation_request.last_name
         verifier = signup_confirmation_request.verifier
         salt = signup_confirmation_request.salt
         encrypted_key_wrapping_key = (
@@ -187,9 +181,7 @@ def confirm_sign_up(
         user_id = user.id
 
         # Update user status and profile data
-        updated_user = schemas.UserUpdate(
-            first_name=first_name, last_name=last_name, status="confirmed"
-        )
+        updated_user = schemas.UserUpdate(status="confirmed")
         crud.update_user(db=db, db_user=user, user=updated_user)
 
         # Store salt and verifier
@@ -204,17 +196,7 @@ def confirm_sign_up(
 
         # Create deafult vault
         vault = schemas.VaultCreate(name="Default Vault", is_default=True)
-        db_vault = crud.create_vault(db, vault, creator_id=user_id)
-
-        # logging.error(f"created vault {user_id}", db_vault)
-
-        # schemas.ItemCreate(
-        #     title="Keylance Master Password",
-        #     username=email,
-        #     password=password,
-        #     type="PASSWORD",
-        # )
-        # crud.create_item(db, item, vault_id=db_vault.id, creator_id=user_id)
+        db_vault = crud.create_vault(db, vault, user_id=user_id)
 
         db.commit()
     except HTTPException:
@@ -466,7 +448,7 @@ def login_confirm(
 
         # expire active sessions
         crud.expire_active_sessions(
-            db, user_id, client_id, platform_client_id, session_id
+            db, platform_client_id, session_id
         )
 
         # Activate session
@@ -521,8 +503,6 @@ def logout(
             # expire active sessions which belong to specific browser/device
             crud.expire_active_sessions(
                 db,
-                user_id=session_details["userId"],
-                client_id=session_details["clientId"],
                 platform_client_id=session_details["platformClientId"],
                 session_id=session_id,
             )
@@ -586,8 +566,6 @@ def login_refresh(
             # expire active sessions
             crud.expire_active_sessions(
                 db,
-                user_id=session_details["userId"],
-                client_id=session_details["clientId"],
                 platform_client_id=session_details["platformClientId"],
             )
 
@@ -644,8 +622,6 @@ def auth_status(
                 # expire active sessions which belong to specific browser/device
                 crud.expire_active_sessions(
                     db,
-                    user_id=db_session.user_id,
-                    client_id=db_session.client_id,
                     platform_client_id=db_session.platform_client_id,
                     session_id=session_id,
                 )

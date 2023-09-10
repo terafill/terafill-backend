@@ -1,7 +1,17 @@
 from datetime import datetime
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum, JSON, DateTime
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    ForeignKey,
+    Enum,
+    JSON,
+    DateTime,
+    CHAR,
+    Boolean,
+)
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -21,18 +31,15 @@ class ItemType(str, PyEnum):
 
 class Item(Base):
     __tablename__ = "items"
-    id = Column(String(128), primary_key=True, index=True)
-    title = Column(String(100), index=True)
+    id = Column(CHAR(36), primary_key=True, index=True)
+    vault_id = Column(CHAR(36))
+    user_id = Column(CHAR(36))
+    title = Column(String(64))
     description = Column(String(255))
-    username = Column(String(255))
-    password = Column(String(255))
+    username = Column(String(128))
+    password = Column(String(128))
     website = Column(String(255))
     tags = Column(JSON, nullable=True)
-    notes = Column(String(1024))
     type = Column(Enum(ItemType, name="item_type"))
-    vault_id = Column(String(128), ForeignKey("vaults.id"))
-    creator_id = Column(String(128), ForeignKey("users.id"))
+    is_favorite = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    # vault = relationship("Vault", back_populates="items")
-    # history = relationship("PasswordHistory", back_populates="item")

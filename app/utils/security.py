@@ -165,8 +165,6 @@ def get_current_user(
                 # expire active sessions which belong to specific browser/device
                 crud.expire_active_sessions(
                     db,
-                    user_id=db_session.user_id,
-                    client_id=db_session.client_id,
                     platform_client_id=db_session.platform_client_id,
                     session_id=session_id,
                 )

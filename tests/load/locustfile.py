@@ -182,7 +182,8 @@ class NormalUser(HttpUser):
                     # print("delete vault item", response.status_code)
 
     def on_start(self):
-        self.email = f"{get_rand_string(8)}@keylance.io"
+        # self.email = f"{get_rand_string(8)}.warmup@keylance.io"
+        self.email = f"{get_rand_string(8)}.load@keylance.io"
         self.password = get_rand_string(10)
 
         new_signup(
@@ -216,27 +217,27 @@ class NormalUser(HttpUser):
         from app.models.vault import Vault
         
         time.sleep(1)
-        db = SessionLocal()
+        # db = SessionLocal()
 
-        with db.begin():
-            try:
-                user = db.query(User).filter(User.email == self.email).first()
-                if user:
-                    user_id = user.id
-                    response = self.client.delete(
-                        self.host + f"/users/{user_id}",
-                        cookies=self.cookies,
-                        name="/users/{user_id}",
-                    )
-                    if response.status_code == 204:
-                        print(f"User {self.email} deleted successfully.", response)
-                    else:
-                        print(response.text)
-                        print(f"User {self.email} deletion failed.", response)
-                else:
-                    print("User not found")
-            except Exception as e:
-                db.close()
-                raise
-            finally:
-                db.close()
+        # with db.begin():
+        #     try:
+        #         user = db.query(User).filter(User.email == self.email).first()
+        #         if user:
+        #             user_id = user.id
+        #             response = self.client.delete(
+        #                 self.host + f"/users/{user_id}",
+        #                 cookies=self.cookies,
+        #                 name="/users/{user_id}",
+        #             )
+        #             if response.status_code == 204:
+        #                 print(f"User {self.email} deleted successfully.", response)
+        #             else:
+        #                 print(response.text)
+        #                 print(f"User {self.email} deletion failed.", response)
+        #         else:
+        #             print("User not found")
+        #     except Exception as e:
+        #         db.close()
+        #         raise
+        #     finally:
+        #         db.close()

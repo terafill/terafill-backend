@@ -21,10 +21,7 @@ def get_session(db: Session, session_id: str, pruned=False):
             )
             .first()
         )
-    return (
-        db.query(models.Session)
-        .filter(models.Session.id == session_id).first()
-    )
+    return db.query(models.Session).filter(models.Session.id == session_id).first()
 
 
 def create_session(db: Session, session: schemas.Session):
@@ -47,13 +44,9 @@ def create_session(db: Session, session: schemas.Session):
     return db_session
 
 
-def expire_active_sessions(
-    db: Session, user_id: str, client_id: str, platform_client_id: str, session_id: str
-):
+def expire_active_sessions(db: Session, platform_client_id: str, session_id: str):
     # Delete all sessions that match the given criteria
     db.query(models.Session).filter(
-        models.Session.user_id == user_id,
-        models.Session.client_id == client_id,
         models.Session.platform_client_id == platform_client_id,
         models.Session.id != session_id,
     ).delete()

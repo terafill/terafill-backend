@@ -1,7 +1,7 @@
 CREATE TABLE `srp_data` (
-	`user_id` varchar(128) NOT NULL,
-	`verifier` text,
-	`salt` text,
+	`user_id` char(36),
+	`verifier` varchar(512),
+	`salt` varchar(32),
 	PRIMARY KEY (`user_id`)
 ) ENGINE InnoDB,
 CHARSET utf8mb4,

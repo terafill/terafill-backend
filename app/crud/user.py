@@ -10,20 +10,10 @@ def get_user(db: Session, user_id: str):
     return db_user
 
 
-def get_user_profile_image(db: Session, user_id: str):
-    db_user = db.query(models.User).filter(models.User.id == user_id).first()
-    return db_user.profile_image
-
-
 def get_user_by_email(db: Session, email: str, fields: list = None):
     if fields:
         return db.query(*fields).filter(models.User.email == email).first()
     return db.query(models.User).filter(models.User.email == email).first()
-
-
-def get_user_by_sub(db: Session, sub: str):
-    print("get_user_by_sub.sub", sub)
-    return db.query(models.User).filter(models.User.sub == sub).first()
 
 
 def get_users(db: Session, skip: int = 0, limit: int = 100):
@@ -35,11 +25,6 @@ def create_user(db: Session, user: schemas.UserCreate):
     db_user = models.User(
         email=user.email,
         secondary_email=user.secondary_email,
-        phone_no=user.phone_no,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        gender=user.gender,
-        birthday=user.birthday,
         id=user_id,
         status=user.status,
     )
@@ -53,14 +38,14 @@ def update_user(db: Session, db_user: schemas.User, user: schemas.UserUpdate):
 
 
 def delete_user(db: Session, user_id: str):
-    # db.query(models.Item).filter(models.Item.creator_id == user_id).delete()
-    # db.query(models.Vault).filter(models.Vault.creator_id == user_id).delete()
-    # db.query(models.EncryptionKey).filter(
-    #     models.EncryptionKey.user_id == user_id
-    # ).delete()
-    # db.query(models.KeyWrappingKey).filter(
-    #     models.KeyWrappingKey.user_id == user_id
-    # ).delete()
-    # db.query(models.SRPData).filter(models.SRPData.user_id == user_id).delete()
-    # db.query(models.Session).filter(models.Session.user_id == user_id).delete()
+    db.query(models.Item).filter(models.Item.user_id == user_id).delete()
+    db.query(models.Vault).filter(models.Vault.user_id == user_id).delete()
+    db.query(models.EncryptionKey).filter(
+        models.EncryptionKey.user_id == user_id
+    ).delete()
+    db.query(models.KeyWrappingKey).filter(
+        models.KeyWrappingKey.user_id == user_id
+    ).delete()
+    db.query(models.SRPData).filter(models.SRPData.user_id == user_id).delete()
+    db.query(models.Session).filter(models.Session.user_id == user_id).delete()
     db.query(models.User).filter(models.User.id == user_id).delete()

@@ -6,45 +6,42 @@ from sqlalchemy import and_
 from .. import models, schemas
 
 
-def get_item(db: Session, user_id: str, vault_id: str, item_id: str):
+def get_item(db: Session, user_id: str, item_id: str):
     return (
         db.query(models.Item)
-        .filter(models.Item.vault_id == vault_id)
-        .filter(models.Item.creator_id == user_id)
         .filter(models.Item.id == item_id)
+        .filter(models.Item.user_id == user_id)
         .first()
     )
 
 
-def get_item_full(db: Session, user_id: str, vault_id: str, item_id: str):
+def get_item_full(db: Session, user_id: str, item_id: str):
     return (
         db.query(models.Item, models.EncryptionKey.encrypted_encryption_key)
         .join(
             models.EncryptionKey,
             and_(
-                models.EncryptionKey.user_id == models.Item.creator_id,
-                models.EncryptionKey.vault_id == models.Item.vault_id,
                 models.EncryptionKey.item_id == models.Item.id,
+                models.EncryptionKey.user_id == models.Item.user_id,
             ),
         )
-        .filter(models.Item.vault_id == vault_id)
-        .filter(models.Item.creator_id == user_id)
+        .filter(models.Item.user_id == user_id)
         .filter(models.Item.id == item_id)
         .first()
     )
 
 
-def get_items(
-    db: Session, user_id: str, vault_id: str, skip: int = 0, limit: int = 100
-):
-    return (
-        db.query(models.Item)
-        .filter(models.Item.vault_id == vault_id)
-        .filter(models.Item.creator_id == user_id)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+# def get_items(
+#     db: Session, user_id: str, vault_id: str, skip: int = 0, limit: int = 100
+# ):
+#     return (
+#         db.query(models.Item)
+#         .filter(models.Item.vault_id == vault_id)
+#         .filter(models.Item.user_id == user_id)
+#         .offset(skip)
+#         .limit(limit)
+#         .all()
+#     )
 
 
 def get_items_full(
@@ -55,20 +52,19 @@ def get_items_full(
         .join(
             models.EncryptionKey,
             and_(
-                models.EncryptionKey.user_id == models.Item.creator_id,
-                models.EncryptionKey.vault_id == models.Item.vault_id,
                 models.EncryptionKey.item_id == models.Item.id,
+                models.EncryptionKey.user_id == models.Item.user_id,
             ),
         )
         .filter(models.Item.vault_id == vault_id)
-        .filter(models.Item.creator_id == user_id)
+        .filter(models.Item.user_id == user_id)
         .offset(skip)
         .limit(limit)
         .all()
     )
 
 
-def create_item(db: Session, item: schemas.ItemCreate, vault_id: str, creator_id: str):
+def create_item(db: Session, item: schemas.ItemCreate, vault_id: str, user_id: str):
     item_id = uuid.uuid4()
 
     db_item = models.Item(
@@ -77,10 +73,9 @@ def create_item(db: Session, item: schemas.ItemCreate, vault_id: str, creator_id
         username=item.username,
         password=item.password,
         website=item.website,
-        notes=item.notes,
         type=item.type,
         tags=item.tags,
-        creator_id=creator_id,
+        user_id=user_id,
         vault_id=vault_id,
         id=item_id,
     )
