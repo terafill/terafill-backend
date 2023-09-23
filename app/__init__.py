@@ -7,7 +7,6 @@ from fastapi.openapi.utils import get_openapi
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from fastapi.responses import JSONResponse
 
-
 ENV = os.getenv("ENV", "LOCAL")
 
 env2config = {
@@ -20,6 +19,8 @@ if int(os.getenv("LOAD_ENV_FROM_FILE", 1)):
     load_dotenv(env2config[ENV])
 
 # from fastapi.openapi.docs import get_swagger_ui_html
+
+from .utils.logging import logger
 
 # from . import models, views
 from .database import Base, engine
@@ -34,6 +35,7 @@ from .views import (
 
 from . import utils
 from .utils.otel import trace
+from .database import SessionLocal
 import app.utils.errors as internal_exceptions
 
 
@@ -84,15 +86,17 @@ async def custom_middleware(request: Request, call_next):
     start_time = time.time()
 
     try:
+        # request.state.db = SessionLocal()
         response = await call_next(request)
+        # request.state.db.close()
     except Exception as e:
-        # Log the exception for debugging or monitoring purposes
-        print(f"An unexpected error occurred: {e}")
+        logger.exception(f"An unexpected exception occurred: {e}", exc_info=True)
 
         # Create an HTTP 500 response
         response = JSONResponse(
             content={"message": "Internal Server Error"}, status_code=500
         )
+        # request.state.db.close()
 
     end_time = time.time() - start_time
     response.headers["Server-Timing"] = f"total;dur={str(end_time * 1000)}"

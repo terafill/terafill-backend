@@ -6,3 +6,7 @@ def to_lower_camel_case(snake_str):
     # with the 'capitalize' method and join them together.
     camel_string = to_camel_case(snake_str)
     return snake_str[0].lower() + camel_string[1:]
+
+orm_result_to_dict = lambda x: {
+    k: v for k, v in x.__dict__.items() if not k.startswith("_")
+}

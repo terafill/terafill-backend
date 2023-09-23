@@ -11,6 +11,7 @@ from fastapi import (
     UploadFile,
     File,
     Form,
+    Request,
     Response,
 )
 from sqlalchemy.orm import Session
@@ -21,6 +22,8 @@ from .. import models, schemas, crud
 from ..utils.security import get_current_user
 from ..database import get_db
 from ..config import ENV
+from ..utils.logging import logger
+from ..utils.schema_helpers import orm_result_to_dict
 
 
 router = APIRouter(dependencies=[], tags=["user"])
@@ -29,6 +32,20 @@ router = APIRouter(dependencies=[], tags=["user"])
 @router.get("/hello")
 async def hello():
     return "hello"
+
+
+@router.get("/fetch-image")
+def fetch_image(url: str):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        mime_type = response.headers["content-type"]
+        base64_image = base64.b64encode(response.content).decode("utf-8")
+        return {"data_url": f"data:{mime_type};base64,{base64_image}"}
+    except requests.HTTPError as e:
+        raise HTTPException(status_code=400, detail="Image not found") from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.post("/users/me/vaults", response_model=schemas.Vault, tags=["current_user"])
@@ -137,7 +154,7 @@ def create_item(
     current_user: models.User = Depends(get_current_user),
 ):
     try:
-        db_item = crud.create_item(
+        db_item, custom_field_list = crud.create_item(
             db=db, item=item, vault_id=vault_id, user_id=current_user.id
         )
         encrypted_encryption_key = item.encrypted_encryption_key
@@ -145,6 +162,7 @@ def create_item(
             db, encrypted_encryption_key, current_user.id, db_item.id
         )
         db.commit()
+        db_item.custom_item_fields = custom_field_list
         return db_item
     except HTTPException:
         db.rollback()
@@ -172,15 +190,23 @@ def read_items(
         results = crud.get_items_full(
             db, user_id=current_user.id, vault_id=vault_id, skip=skip, limit=limit
         )
-        items = []
+        item_dict = {}
 
-        for result in results:
-            item, encrypted_encryption_key = result
-            # item_data = item.__dict__.copy()  # this copies all the item attributes into a dictionary
-            item_data = {
-                k: v for k, v in item.__dict__.items() if not k.startswith("_")
-            }
-            item_data["encrypted_encryption_key"] = encrypted_encryption_key
+        for item_data in results:
+            item, encrypted_encryption_key, custom_item_fields = item_data
+            if item.id not in item_dict:
+                item_dict[item.id] = orm_result_to_dict(item)
+                item_dict[item.id][
+                    "encrypted_encryption_key"
+                ] = encrypted_encryption_key
+                item_dict[item.id]["custom_item_fields"] = []
+
+            if custom_item_fields:
+                item_dict[item.id]["custom_item_fields"].append(
+                    orm_result_to_dict(custom_item_fields)
+                )
+        items = []
+        for item_data in item_dict.values():
             items.append(schemas.Item(**item_data))
         return items
     except HTTPException:
@@ -203,22 +229,60 @@ def read_item(
     current_user: models.User = Depends(get_current_user),
 ):
     try:
-        result = crud.get_item_full(
-            db, user_id=current_user.id, vault_id=vault_id, item_id=item_id
-        )
+        result = crud.get_item_full(db, user_id=current_user.id, item_id=item_id)
         if result is None:
             raise HTTPException(status_code=404, detail="Item not found")
 
-        item, encrypted_encryption_key = result
-        # item_data = item.__dict__.copy()  # this copies all the item attributes into a dictionary
-        item_data = {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
-        item_data["encrypted_encryption_key"] = encrypted_encryption_key
-        item = schemas.Item(**item_data)
+        item, encrypted_encryption_key, custom_item_fields = result[0]
+
+        item_dict = orm_result_to_dict(item)
+        item_dict["encrypted_encryption_key"] = encrypted_encryption_key
+        item_dict["custom_item_fields"] = []
+
+        for item_data in result:
+            item, encrypted_encryption_key, custom_item_fields = item_data
+            if custom_item_fields:
+                item_dict["custom_item_fields"].append(
+                    orm_result_to_dict(custom_item_fields)
+                )
+
+        item = schemas.Item(**item_dict)
         return item
     except HTTPException:
+        logging.error(f"Error: {e}", exc_info=True)
         raise
     except Exception as e:
+        logging.error(f"Error: {e}", exc_info=True)
         raise internal_exceptions.InternalServerException()
+
+
+from functools import wraps
+
+
+# def exception_handler(db: Session):
+#     def decorator(func):
+#         @wraps(func)
+#         def wrapper(*args, **kwargs):
+#             try:
+#                 return func(*args, **kwargs)
+#             except HTTPException as e:
+#                 logger.exception(
+#                     f"An error occurred in route {func.__name__}: {str(e)}",
+#                     exc_info=True,
+#                 )
+#                 db.rollback()
+#                 raise
+#             except Exception as e:
+#                 logger.exception(
+#                     f"An error occurred in route {func.__name__}: {str(e)}",
+#                     exc_info=True,
+#                 )
+#                 db.rollback()
+#                 raise internal_exceptions.InternalServerException()
+
+#         return wrapper
+
+#     return decorator
 
 
 @router.put(
@@ -234,16 +298,26 @@ def update_item(
     current_user: models.User = Depends(get_current_user),
 ):
     try:
-        db_item = crud.get_item(db, user_id=current_user.id, item_id=item_id)
-        if db_item is None:
+        results = crud.get_item(db, user_id=current_user.id, item_id=item_id)
+        if results is None:
             raise internal_exceptions.ItemNotFoundException()
-        item = crud.update_item(db=db, db_item=db_item, item=item)
+
+        db_item_list, db_custom_item_fields = list(zip(*results))
+
+        item = crud.update_item(
+            db=db,
+            db_item=db_item_list[0],
+            db_custom_item_fields=db_custom_item_fields,
+            item=item,
+        )
         db.commit()
         return item
-    except HTTPException:
+    except HTTPException as e:
+        logger.exception(f"An error occurred: {str(e)}", exc_info=True)
         db.rollback()
         raise
     except Exception as e:
+        logger.exception(f"An error occurred: {str(e)}", exc_info=True)
         db.rollback()
         raise internal_exceptions.InternalServerException()
 
@@ -259,16 +333,22 @@ def delete_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    db_item = crud.get_item(db, user_id=current_user.id, item_id=item_id)
+    results = crud.get_item(db, user_id=current_user.id, item_id=item_id)
     try:
-        if db_item is None:
+        if results is None:
             raise internal_exceptions.ItemNotFoundException()
-        crud.delete_item(db=db, db_item=db_item)
+        db_item_list, db_custom_item_fields = list(zip(*results))
+
+        crud.delete_item(
+            db=db, db_item=db_item_list[0], db_custom_item_fields=db_custom_item_fields
+        )
         db.commit()
-    except HTTPException:
+    except HTTPException as e:
+        logger.exception(f"An error occurred: {str(e)}", exc_info=True)
         db.rollback()
         raise
     except Exception as e:
+        logger.exception(f"An error occurred: {str(e)}", exc_info=True)
         db.rollback()
         raise internal_exceptions.InternalServerException()
 

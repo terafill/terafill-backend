@@ -1,5 +1,8 @@
 PORT ?= 8000
 MYSQL_DUMP_VERSION ?= vx
+DATABASE ?= keylance
+ORG_ID ?= keylance
+WORKERS ?= 1
 
 setup_tests:
 	ulimit -n 4096
@@ -11,9 +14,9 @@ load_dev:
 	export ENV=DEV && locust -f tests/load/locustfile.py --logfile locust.log
 
 run_local: setup_tests
-	# hypercorn app:app --bind 0.0.0.0:8000 -w 4 -k trio
-	gunicorn -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:$(PORT) app:app
-	# uvicorn  app:app --host 0.0.0.0 --port 8000 --workers 4
+	# hypercorn app:app --bind 0.0.0.0:$(PORT) -w ${WORKERS} -k trio
+	gunicorn -k uvicorn.workers.UvicornWorker -w ${WORKERS} -b 0.0.0.0:$(PORT) app:app --log-level debug --access-logfile access.log --error-logfile error.log
+	# uvicorn  app:app --host 0.0.0.0 --port $(PORT) --workers ${WORKERS}
 
 build_docker:
 	docker build -t keylance-backend .	
@@ -26,3 +29,6 @@ run_otel_local:
 
 backup_mysql_local:
 	sudo mysqldump  keylance > ./mysql_dumps/mysql_dump_${MYSQL_DUMP_VERSION}.sql
+
+backend_mysql:
+	pscale database dump ${DATABASE} ${ENV@L} --output mysql_dumps/${ENV@L}/$(date +"%Y-%m-%d_%H-%M-%S") --service-token ${PLANET_SCALE_SERVICE_TOKEN} --service-token-id ${PLANET_SCALE_SERVICE_TOKEN} --org ${ORG_ID} --debug

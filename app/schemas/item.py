@@ -18,6 +18,16 @@ class ItemType(str, Enum):
     DOCUMENT = "DOCUMENT"
 
 
+class CustomItemField(BaseModel):
+    field_value: str
+    field_name: str
+    # id: UUID4
+    is_tag: bool
+    model_config = ConfigDict(
+        from_attributes=True, alias_generator=to_lower_camel_case, populate_by_name=True
+    )
+
+
 class ItemBase(BaseModel):
     title: Optional[str] = None
     description: Optional[Union[str, None]] = None
@@ -27,11 +37,11 @@ class ItemBase(BaseModel):
     tags: Optional[List[str]] = None
     type: Optional[ItemType] = None
     encrypted_encryption_key: Optional[str] = None
+    is_favorite: Optional[bool] = False
+    custom_item_fields: List[CustomItemField] = []
 
     model_config = ConfigDict(
-        from_attributes=True,
-        alias_generator=to_lower_camel_case,
-        populate_by_name=True
+        from_attributes=True, alias_generator=to_lower_camel_case, populate_by_name=True
     )
 
 
@@ -39,8 +49,24 @@ class ItemCreate(ItemBase):
     title: str
 
 
+class FieldActionType(str, Enum):
+    CREATE = "CREATE"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+
+
+class CustomItemFieldUpdate(CustomItemField):
+    action: Optional[FieldActionType] = None
+    id: UUID4
+
+
 class ItemUpdate(ItemBase):
+    custom_item_fields: List[CustomItemFieldUpdate]
     pass
+
+
+class CustomItemFieldFull(CustomItemField):
+    id: UUID4
 
 
 class Item(ItemBase):
@@ -48,4 +74,5 @@ class Item(ItemBase):
     user_id: UUID4
     created_at: datetime
     vault_id: UUID4
+    custom_item_fields: List[CustomItemFieldFull]
     # model_config = ConfigDict(from_attributes=True)

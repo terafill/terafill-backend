@@ -43,3 +43,13 @@ class Item(Base):
     type = Column(Enum(ItemType, name="item_type"))
     is_favorite = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CustomItemField(Base):
+    __tablename__ = "custom_item_fields"
+    id = Column(CHAR(36), primary_key=True, index=True)
+    user_id = Column(CHAR(36))
+    item_id = Column(CHAR(36))
+    field_name = Column(String(128))
+    field_value = Column(String(255))
+    is_tag = Column(Boolean)
