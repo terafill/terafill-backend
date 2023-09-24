@@ -187,3 +187,52 @@ def delete_item(db: Session, db_item: schemas.Item, db_custom_item_fields):
     for db_custom_item_field in db_custom_item_fields:
         if db_custom_item_field:
             db.delete(db_custom_item_field)
+
+
+def get_tags(db: Session, user_id: str, skip: int = 0, limit: int = 100):
+    tags = (
+        db.query(
+            models.CustomItemField.field_value,
+        )
+        .filter(models.CustomItemField.user_id == user_id)
+        .filter(models.CustomItemField.is_tag == True)
+        .distinct(models.CustomItemField.field_value)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return tags
+
+def get_items_full_by_tag_id(
+    db: Session, user_id: str, tag_id: str, skip: int = 0, limit: int = 100
+):
+    items = (
+        db.query(
+            models.Item,
+            models.EncryptionKey.encrypted_encryption_key,
+            models.CustomItemField,
+        )
+        .join(
+            models.EncryptionKey,
+            and_(
+                models.EncryptionKey.item_id == models.Item.id,
+                models.EncryptionKey.user_id == models.Item.user_id,
+            ),
+        )
+        .outerjoin(
+            models.CustomItemField,
+            and_(
+                models.CustomItemField.item_id == models.Item.id,
+                models.CustomItemField.user_id == models.Item.user_id,
+            ),
+        )
+        .filter(models.CustomItemField.field_value == tag_id)
+        .filter(models.CustomItemField.is_tag == True)        
+        .filter(models.Item.user_id == user_id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return items

@@ -218,6 +218,73 @@ def read_items(
 
 
 @router.get(
+    "/users/me/tags/{tag_id}/items",
+    response_model=List[schemas.Item],
+    tags=["current_user"],
+)
+def read_items_by_tag_id(
+    tag_id: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    try:
+        results = crud.get_items_full_by_tag_id(
+            db, user_id=current_user.id, tag_id=tag_id, skip=skip, limit=limit
+        )
+        item_dict = {}
+
+        for item_data in results:
+            item, encrypted_encryption_key, custom_item_fields = item_data
+            if item.id not in item_dict:
+                item_dict[item.id] = orm_result_to_dict(item)
+                item_dict[item.id][
+                    "encrypted_encryption_key"
+                ] = encrypted_encryption_key
+                item_dict[item.id]["custom_item_fields"] = []
+
+            if custom_item_fields:
+                item_dict[item.id]["custom_item_fields"].append(
+                    orm_result_to_dict(custom_item_fields)
+                )
+        items = []
+        for item_data in item_dict.values():
+            items.append(schemas.Item(**item_data))
+        return items
+    except HTTPException:
+        logging.error(f"Error: {e}", exc_info=True)
+        raise
+    except Exception as e:
+        logging.error(f"Error: {e}", exc_info=True)
+        raise internal_exceptions.InternalServerException()
+
+
+@router.get(
+    "/users/me/tags",
+    # response_model=List[schemas.Item],
+    tags=["current_user"],
+)
+def read_tags(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    try:
+        result = crud.get_tags(db, user_id=current_user.id, skip=skip, limit=limit)
+        if result:
+            return list(map(lambda x: x["field_value"], result))
+        return []
+    except HTTPException:
+        logging.error(f"Error: {e}", exc_info=True)
+        raise
+    except Exception as e:
+        logging.error(f"Error: {e}", exc_info=True)
+        raise internal_exceptions.InternalServerException()
+
+
+@router.get(
     "/users/me/vaults/{vault_id}/items/{item_id}",
     response_model=schemas.Item,
     tags=["current_user"],

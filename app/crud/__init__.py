@@ -24,6 +24,8 @@ from .item import (
     delete_item,
     get_item_full,
     get_items_full,
+    get_tags,
+    get_items_full_by_tag_id
 )
 
 
