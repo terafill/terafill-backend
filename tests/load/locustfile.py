@@ -182,8 +182,8 @@ class NormalUser(HttpUser):
                     # print("delete vault item", response.status_code)
 
     def on_start(self):
-        # self.email = f"{get_rand_string(8)}.warmup@keylance.io"
-        self.email = f"{get_rand_string(8)}.load@keylance.io"
+        # self.email = f"{get_rand_string(8)}.warmup@terafill.com"
+        self.email = f"{get_rand_string(8)}.load@terafill.com"
         self.password = get_rand_string(10)
 
         new_signup(
