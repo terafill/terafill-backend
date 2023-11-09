@@ -12,7 +12,7 @@ CREATE TABLE `sessions` (
     `session_token` varchar(1024) NOT NULL,
     `session_encryption_key` varchar(128) NOT NULL,
     `activated` tinyint(1),
-    PRIMARY KEY (`id`) INDEX `user_id_idx` (`user_id`) INDEX `platform_client_id_idx` (`platform_client_id`)
-) ENGINE InnoDB,
-CHARSET utf8mb4,
-COLLATE utf8mb4_0900_ai_ci;
+    PRIMARY KEY (`id`),
+    INDEX `user_id_idx` (`user_id`),
+    INDEX `platform_client_id_idx` (`platform_client_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
