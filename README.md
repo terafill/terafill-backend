@@ -76,10 +76,3 @@ pip install requirements.txt
 ``` 
 make run_local
 ```
-
-
-
- 
-
-
-
