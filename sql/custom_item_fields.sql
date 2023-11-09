@@ -8,4 +8,4 @@ CREATE TABLE `custom_item_fields` (
     PRIMARY KEY (`id`),
     INDEX `item_id_idx` (`item_id`),
     INDEX `user_id_idx` (`user_id`)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

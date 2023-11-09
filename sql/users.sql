@@ -13,6 +13,4 @@ CREATE TABLE `users` (
     `created_at` datetime NOT NULL DEFAULT current_timestamp(),
     PRIMARY KEY (`id`),
     UNIQUE KEY `email` (`email`)
-) ENGINE InnoDB,
-CHARSET utf8mb4,
-COLLATE utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

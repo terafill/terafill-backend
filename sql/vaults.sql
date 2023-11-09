@@ -8,6 +8,4 @@ CREATE TABLE `vaults` (
     `is_default` tinyint(1),
     PRIMARY KEY (`id`),
     INDEX `user_id_idx` (`user_id`)
-) ENGINE InnoDB,
-CHARSET utf8mb4,
-COLLATE utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
