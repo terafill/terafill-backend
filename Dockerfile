@@ -11,7 +11,8 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY ./app /app
+COPY main.py /main.py
 
-WORKDIR /app
+WORKDIR /
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "main.py"]
