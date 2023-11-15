@@ -21,6 +21,7 @@ from ..utils.otel import tracer
 
 
 def get_session_private_key(alg="ec"):
+    """Function to create a new cryptographic private key"""
     if alg == "ec":
         # Generate ECDH key pair
         private_key = ec.generate_private_key(ec.SECP521R1())
@@ -48,6 +49,8 @@ def get_session_private_key(alg="ec"):
 
 
 def get_session_public_key(session_private_key):
+    """Function to generate cryptographic session public from given private key"""
+
     # Load the private key from the data
     private_key = serialization.load_pem_private_key(
         session_private_key.encode(),
@@ -68,32 +71,15 @@ def get_session_public_key(session_private_key):
     return session_public_key
 
 
-# def get_session_token(
-#     user_id, session_id, client_id, platform_client_id, session_private_key
-# ):
-#     jwe = JsonWebEncryption()
-#     protected = {"alg": "RSA-OAEP-256", "enc": "A256GCM"}
-#     payload = json.dumps(
-#         {
-#             "userId": user_id,
-#             "sessionId": session_id,
-#             "clientId": client_id,
-#             "platformClientId": platform_client_id,
-#             "tier": "pro",
-#         }
-#     )
-
-#     session_public_key = get_session_public_key(session_private_key)
-#     session_token = jwe.serialize_compact(protected, payload, session_public_key)
-#     return session_token.decode()
-
-
 def get_session_token(
     user_id, session_id, client_id, platform_client_id, session_private_key, alg="ec"
 ):
+    """Function to generate a new login session token using login session details"""
     jwe = JsonWebEncryption()
     if alg == "ec":
         protected = {"alg": "ECDH-ES+A256KW", "enc": "A256GCM"}
+    elif alg == "RSA-OAEP-256":
+        protected = {"alg": "RSA-OAEP-256", "enc": "A256GCM"}
     else:
         protected = {"alg": "RSA-AEP", "enc": "A256GCM"}
 
@@ -113,6 +99,7 @@ def get_session_token(
 
 
 def get_session_details(session_token, session_private_key):
+    """Decode and fetch login session details from give session token."""
     jwe = JsonWebEncryption()
     data = jwe.deserialize_compact(session_token, session_private_key)
     session_details = json.loads(data["payload"].decode())
@@ -132,6 +119,7 @@ def get_current_user(
     sessionId: Annotated[Union[str, None], Cookie()] = None,
     sessionToken: Annotated[Union[str, None], Cookie()] = None,
 ):
+    """Function to fetch details of a user from session token and cookies"""
     user_id = userId
     session_id = sessionId
     session_token = sessionToken

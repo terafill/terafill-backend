@@ -54,6 +54,7 @@ def create_vault(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to create a vault"""
     try:
         vault = crud.create_vault(db=db, vault=vault, user_id=current_user.id)
         db.commit()
@@ -73,6 +74,7 @@ def read_vaults(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to get list of vaults"""
     vaults = crud.get_vaults_by_user_id(
         db, user_id=current_user.id, skip=skip, limit=limit
     )
@@ -85,6 +87,7 @@ def read_vaults(
 def read_vault(
     vault_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
 ):
+    """Function get metadata of a vault"""
     try:
         vault = crud.get_vault(db, user_id=current_user.id, vault_id=vault_id)
         if vault is None:
@@ -105,6 +108,7 @@ def update_vault(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    """Function to update a vault"""
     try:
         db_vault = crud.get_vault(db, user_id=current_user.id, vault_id=vault_id)
         if db_vault is None:
@@ -126,6 +130,7 @@ def update_vault(
 def delete_vault(
     vault_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
 ):
+    """Function to delete a vault"""
     try:
         db_vault = crud.get_vault(db, user_id=current_user.id, vault_id=vault_id)
         if db_vault is None:
@@ -153,6 +158,7 @@ def create_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to create an vault item"""
     try:
         db_item, custom_field_list = crud.create_item(
             db=db, item=item, vault_id=vault_id, user_id=current_user.id
@@ -186,6 +192,7 @@ def read_items(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to fetch list of items belonging to a vault"""
     try:
         results = crud.get_items_full(
             db, user_id=current_user.id, vault_id=vault_id, skip=skip, limit=limit
@@ -229,6 +236,7 @@ def read_items_by_tag_id(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to fetch list of items related to given tag-id"""
     try:
         results = crud.get_items_full_by_tag_id(
             db, user_id=current_user.id, tag_id=tag_id, skip=skip, limit=limit
@@ -271,6 +279,7 @@ def read_tags(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to fetch list of tags/labels"""
     try:
         result = crud.get_tags(db, user_id=current_user.id, skip=skip, limit=limit)
         if result:
@@ -295,6 +304,7 @@ def read_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to fetch vault item data"""
     try:
         result = crud.get_item_full(db, user_id=current_user.id, item_id=item_id)
         if result is None:
@@ -323,35 +333,6 @@ def read_item(
         raise internal_exceptions.InternalServerException()
 
 
-from functools import wraps
-
-
-# def exception_handler(db: Session):
-#     def decorator(func):
-#         @wraps(func)
-#         def wrapper(*args, **kwargs):
-#             try:
-#                 return func(*args, **kwargs)
-#             except HTTPException as e:
-#                 logger.exception(
-#                     f"An error occurred in route {func.__name__}: {str(e)}",
-#                     exc_info=True,
-#                 )
-#                 db.rollback()
-#                 raise
-#             except Exception as e:
-#                 logger.exception(
-#                     f"An error occurred in route {func.__name__}: {str(e)}",
-#                     exc_info=True,
-#                 )
-#                 db.rollback()
-#                 raise internal_exceptions.InternalServerException()
-
-#         return wrapper
-
-#     return decorator
-
-
 @router.put(
     "/users/me/vaults/{vault_id}/items/{item_id}",
     response_model=schemas.Item,
@@ -364,6 +345,7 @@ def update_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to update a vault item"""
     try:
         results = crud.get_item(db, user_id=current_user.id, item_id=item_id)
         if results is None:
@@ -400,6 +382,7 @@ def delete_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to delete a vault item"""
     results = crud.get_item(db, user_id=current_user.id, item_id=item_id)
     try:
         if results is None:
@@ -426,6 +409,7 @@ def delete_user(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    """Function to delete a user. Only applicable in local environments."""
     try:
         if ENV != "LOCAL":
             raise internal_exceptions.InvalidUserDeletionRequestException()
