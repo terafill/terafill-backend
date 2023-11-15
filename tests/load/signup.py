@@ -4,7 +4,7 @@ import json
 import random
 from secrets import choice
 
-from database import SessionLocal
+from .database import SessionLocal
 from app.models.user import User
 
 from srptools import SRPContext

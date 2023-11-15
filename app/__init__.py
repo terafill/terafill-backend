@@ -25,10 +25,7 @@ from .utils.logging import logger
 # from . import models, views
 from .database import Base, engine
 from .views import (
-    vault,
-    # item,
     user,
-    # master_password
     auth,
     icon,
 )
@@ -44,33 +41,21 @@ app = FastAPI()
 
 Base.metadata.create_all(bind=engine)
 
-# app.include_router(item.router, prefix="/api/v1")
 app.include_router(user.router, prefix="/api/v1")
-app.include_router(vault.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(icon.router, prefix="/api/v1")
-# app.include_router(master_password.router, prefix="/api/v1")
+
+
+def get_allowed_origins():
+    origin_list_str = os.getenv("ALLOWED_ORIGINS", "")
+    origin_list = origin_list_str.split(",")
+    return origin_list
 
 
 # Add the CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "chrome-extension://khlffdhmbhlkkmcgmhbhjpjidllcdgmb",
-        "https://dev.terafill.com",
-        "https://dev.api.terafill.com",
-        "https://www.terafill.com",
-        "https://terafill.com",
-        # "*"
-        "http://localhost:3000",
-        # "http://localhost:3004",
-        # "https://keylance-backend-svc-dev.up.railway.app",
-        # "https://keylance-dc9c3k23s-harshitsaini.vercel.app"
-        # "https://www.keylance.io",
-        # "https://keylance.io",
-        "https://keylance-harshitsaini.vercel.app",
-        "https://keylance.vercel.app",
-    ],
+    allow_origins=get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
