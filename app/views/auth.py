@@ -54,6 +54,8 @@ class SignupRequest(BaseModel):  # Model for email verification request
 
 
 def send_verification_code(email: str, verification_code):
+    """Function to send email verification code using AWS SES"""
+
     sender = "harshitsaini15@gmail.com"
     subject = "Email Verification Code"
     message = f"Your verification code is {verification_code}"
@@ -94,6 +96,7 @@ def send_verification_code(email: str, verification_code):
 def signup(
     signup_request: SignupRequest, db: Session = Depends(get_db), mock: bool = False
 ):
+    """Function to create a new user account"""
     try:
         email = signup_request.email
         user_type = None
@@ -164,6 +167,7 @@ def confirm_sign_up(
     client_id: Annotated[Union[str, None], Header()] = None,
     platform_client_id: Annotated[Union[str, None], Cookie()] = None,
 ):
+    """Function to confirm user account creation/signup"""
     try:
         email = signup_confirmation_request.email
         verification_code = signup_confirmation_request.verification_code
@@ -218,6 +222,7 @@ def build_session(
     platform_client_id=None,
     session_private_key=None,
 ):
+    """Function to create details required for user's login session"""
     if platform_client_id is None:
         platform_client_id = str(uuid.uuid4())
 
@@ -264,6 +269,7 @@ def get_salt(
     client_id: str = Header(),
     platform_client_id: Annotated[Union[str, None], Cookie()] = None,
 ):
+    """Function to fetch salt required for SRP login procedure"""
     try:
         email = login_request.email
 
@@ -302,6 +308,7 @@ def login(
     client_id: str = Header(),
     platform_client_id: Annotated[Union[str, None], Cookie()] = None,
 ):
+    """Function to faciliate user account login request"""
     try:
         email = login_request.email
         client_public_key = login_request.client_public_key
@@ -405,6 +412,7 @@ def login_confirm(
     db: Session = Depends(get_db),
     client_id: str = Header(),
 ):
+    """Function to confirm user account login request"""
     try:
         session_id = sessionId
         platform_client_id = platformClientId
@@ -447,9 +455,7 @@ def login_confirm(
         ).encrypted_private_key
 
         # expire active sessions
-        crud.expire_active_sessions(
-            db, platform_client_id, session_id
-        )
+        crud.expire_active_sessions(db, platform_client_id, session_id)
 
         # Activate session
         session = schemas.SessionUpdate(id=session_id, user_id=user_id, activated=True)
@@ -486,6 +492,7 @@ def logout(
     userId: str = Cookie(),
     sessionToken: str = Cookie(),
 ):
+    """Function to logout a user from its account"""
     try:
         user_id = userId
         session_id = sessionId
@@ -522,79 +529,82 @@ def logout(
         raise internal_exceptions.InternalServerException()
 
 
+"""     
 @router.post("/auth/login/refresh", status_code=status.HTTP_200_OK, tags=["auth"])
-def login_refresh(
-    login_request: LoginRequest,
-    db: Session = Depends(get_db),
-    session_id: str = Header(),
-    user_id: str = Header(),
-    session_token: str = Header(),
-):
-    try:
-        email = login_request.email
-        mpesk = login_request.mpesk
+    def login_refresh(
+        login_request: LoginRequest,
+        db: Session = Depends(get_db),
+        session_id: str = Header(),
+        user_id: str = Header(),
+        session_token: str = Header(),
+    ):
 
-        # Get user details
-        db_user = crud.get_user_by_email(db, email)
-        if db_user is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found.",
-            )
-        user_id = db_user.id
+        try:
+            email = login_request.email
+            mpesk = login_request.mpesk
 
-        # # Get user credentials
-        # db_mpesk = crud.get_mpesk(db, user_id)
-        # if db_mpesk.mpesk != mpesk:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_400_BAD_REQUEST,
-        #         detail="Incorrect username or password.",
-        #     )
-
-        db_session = crud.get_session(db, session_id)
-
-        if db_session:
-            session_details = get_session_details(
-                session_token, db_session.session_private_key
-            )
-            if session_details["sessionId"] != session_id:
+            # Get user details
+            db_user = crud.get_user_by_email(db, email)
+            if db_user is None:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid Session token.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found.",
+                )
+            user_id = db_user.id
+
+            # # Get user credentials
+            # db_mpesk = crud.get_mpesk(db, user_id)
+            # if db_mpesk.mpesk != mpesk:
+            #     raise HTTPException(
+            #         status_code=status.HTTP_400_BAD_REQUEST,
+            #         detail="Incorrect username or password.",
+            #     )
+
+            db_session = crud.get_session(db, session_id)
+
+            if db_session:
+                session_details = get_session_details(
+                    session_token, db_session.session_private_key
+                )
+                if session_details["sessionId"] != session_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid Session token.",
+                    )
+
+                # expire active sessions
+                crud.expire_active_sessions(
+                    db,
+                    platform_client_id=session_details["platformClientId"],
                 )
 
-            # expire active sessions
-            crud.expire_active_sessions(
-                db,
-                platform_client_id=session_details["platformClientId"],
-            )
+                # generate session
+                new_session_details = build_session(
+                    db,
+                    session_details["userId"],
+                    session_details["clientId"],
+                    session_details["platformClientId"],
+                    csdek=session_details["csdek"],
+                    session_private_key=db_session.session_private_key,
+                )
 
-            # generate session
-            new_session_details = build_session(
-                db,
-                session_details["userId"],
-                session_details["clientId"],
-                session_details["platformClientId"],
-                csdek=session_details["csdek"],
-                session_private_key=db_session.session_private_key,
-            )
+                return {
+                    "userId": user_id,
+                    "sessionId": new_session_details["sessionId"],
+                    "sessionToken": new_session_details["sessionToken"],
+                    "csdek": new_session_details["csdek"],
+                    "platformClientId": new_session_details["platformClientId"],
+                }
 
-            return {
-                "userId": user_id,
-                "sessionId": new_session_details["sessionId"],
-                "sessionToken": new_session_details["sessionToken"],
-                "csdek": new_session_details["csdek"],
-                "platformClientId": new_session_details["platformClientId"],
-            }
-
-        else:
-            raise internal_exceptions.SessionNotFoundException()
-    except HTTPException:
-        raise
-    except Exception as e:
+            else:
+                raise internal_exceptions.SessionNotFoundException()
+        except HTTPException:
+            raise
+        except Exception as e:
         logging.error(f"Something went wrong: {e}", exc_info=True)
 
         raise internal_exceptions.InternalServerException()
+"""
 
 
 @router.get("/auth/status", status_code=status.HTTP_200_OK, tags=["auth"])
@@ -605,6 +615,7 @@ def auth_status(
     sessionId: str = Cookie(),
     sessionToken: str = Cookie(),
 ):
+    """Function to check status of a login session"""
     try:
         user_id = userId
         session_id = sessionId

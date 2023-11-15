@@ -15,8 +15,8 @@ load_dev:
 
 run_local: setup_tests
 	# hypercorn app:app --bind 0.0.0.0:$(PORT) -w ${WORKERS} -k trio
-	gunicorn -k uvicorn.workers.UvicornWorker -w ${WORKERS} -b 0.0.0.0:$(PORT) app:app --log-level debug --access-logfile access.log --error-logfile error.log
-	# uvicorn  app:app --host 0.0.0.0 --port $(PORT) --workers ${WORKERS}
+	# gunicorn -k uvicorn.workers.UvicornWorker -w ${WORKERS} -b 0.0.0.0:$(PORT) app:app --log-level debug --access-logfile access.log --error-logfile error.log
+	uvicorn  app:app --host 0.0.0.0 --port $(PORT) --workers ${WORKERS}
 
 build_docker:
 	docker build -t terafill-backend .	

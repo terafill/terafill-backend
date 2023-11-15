@@ -11,6 +11,7 @@ router = APIRouter()
 
 @router.get("/icons/{icon_name}")
 def read_icon(icon_name: str, db: Session = Depends(get_db)):
+    """Function to get image data for give icon name"""
     db_icon = db.query(models.Icon).filter(models.Icon.icon_name == icon_name).first()
     if db_icon is None:
         raise HTTPException(status_code=404, detail=f"Icon not found: {icon_name}")
