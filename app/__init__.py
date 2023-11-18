@@ -23,7 +23,7 @@ if int(os.getenv("LOAD_ENV_FROM_FILE", 1)):
 from .utils.logging import logger
 
 # from . import models, views
-from .database import Base, engine
+# from .database import Base, engine
 from .views import (
     user,
     auth,
@@ -32,14 +32,14 @@ from .views import (
 
 from . import utils
 from .utils.otel import trace
-from .database import SessionLocal
+# from .database import SessionLocal
 import app.utils.errors as internal_exceptions
 
 
 app = FastAPI()
 
 
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 
 app.include_router(user.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")

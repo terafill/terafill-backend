@@ -1,18 +1,17 @@
 import os
 
 from opentelemetry import trace
+
 # from opentelemetry.exporter.otlp.exporter import OTLPSpanExporter
 
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
 # from opentelemetry.exporter.jaeger import JaegerSpanExporter
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 
-
-api_token = os.environ["AXIOM_API_TOKEN"]
-org_id = os.environ["AXIOM_ORG_ID"]
 env = os.getenv("ENV", "LOCAL")
 
 service_name = f"backend-srv-{env.lower()}"
@@ -34,6 +33,8 @@ if env.lower() == "local":
     )
     span_processor = BatchSpanProcessor(jaeger_exporter)
 else:
+    org_id = os.environ["AXIOM_ORG_ID"]
+    api_token = os.environ["AXIOM_API_TOKEN"]
     # Instantiate OTLP exporter for other environments
     otlp_exporter = OTLPSpanExporter(
         endpoint="https://api.axiom.co/v1/traces",

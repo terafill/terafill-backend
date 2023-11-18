@@ -9,3 +9,4 @@ MYSQL_DB = os.environ["MYSQL_DB"]
 
 ENV = os.getenv("ENV", "LOCAL")
 DATABASE_URL = f"mysql+mysqldb://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
+print(DATABASE_URL)

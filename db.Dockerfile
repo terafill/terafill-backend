@@ -1,4 +1,4 @@
-FROM mysql
+FROM mysql:8.2.0
 ENV MYSQL_ROOT_PASSWORD Terafill_backend_123
 ENV MYSQL_DATABASE terafill
 ENV MYSQL_USER terafill_backend

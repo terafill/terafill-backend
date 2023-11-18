@@ -78,6 +78,7 @@ def read_vaults(
     vaults = crud.get_vaults_by_user_id(
         db, user_id=current_user.id, skip=skip, limit=limit
     )
+
     return vaults
 
 
