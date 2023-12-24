@@ -32,6 +32,7 @@ from .views import (
 
 from . import utils
 from .utils.otel import trace
+
 # from .database import SessionLocal
 import app.utils.errors as internal_exceptions
 
@@ -47,7 +48,9 @@ app.include_router(icon.router, prefix="/api/v1")
 
 
 def get_allowed_origins():
-    origin_list_str = os.getenv("ALLOWED_ORIGINS", "")
+    origin_list_str = os.getenv("ALLOWED_ORIGINS")
+    if origin_list_str is None:
+        raise Exception("No Allowed origins found!")
     origin_list = origin_list_str.split(",")
     return origin_list
 
@@ -62,12 +65,17 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# FastAPIInstrumentor.instrument_app(app, tracer_provider=trace.get_tracer_provider())
+from prometheus_fastapi_instrumentator import Instrumentator
 
-FastAPIInstrumentor.instrument_app(app, tracer_provider=trace.get_tracer_provider())
+Instrumentator().instrument(app).expose(app)
 
 
 @app.middleware("http")
 async def custom_middleware(request: Request, call_next):
+    # tracer = trace.get_tracer(__name__)
+
+    # with tracer.start_as_current_span("middleware_span"):
     start_time = time.time()
 
     try:

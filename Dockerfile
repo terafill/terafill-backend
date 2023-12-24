@@ -16,6 +16,7 @@ RUN mkdir /terafill_backend
 COPY ./app /terafill_backend/app
 COPY main.py /terafill_backend/main.py
 COPY Makefile /terafill_backend/Makefile
+COPY .env.local /terafill_backend/.env.local
 
 WORKDIR /terafill_backend
 

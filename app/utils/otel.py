@@ -28,8 +28,10 @@ if env.lower() == "local":
     # Instantiate Jaeger exporter for the local environment
     jaeger_exporter = JaegerExporter(
         # service_name=service_name,
-        agent_host_name="localhost",
-        agent_port=6831,
+        # agent_host_name="jaeger",
+        # agent_port=6831,
+        collector_endpoint="http://jaeger:14268/api/traces?format=jaeger.thrift",
+        # transport_format="thrift_http",
     )
     span_processor = BatchSpanProcessor(jaeger_exporter)
 else:

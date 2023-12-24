@@ -17,7 +17,7 @@ from authlib.jose import JsonWebEncryption
 
 from .. import crud
 from ..database import get_db
-from ..utils.otel import tracer
+# from ..utils.otel import tracer
 
 
 def get_session_private_key(alg="ec"):
