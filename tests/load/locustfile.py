@@ -10,9 +10,9 @@ import uuid
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from locust import HttpUser, task, between, TaskSet
 
-from signup import new_signup
-from login import complete_login
-from config import HOST
+from tests.load.signup import new_signup
+from tests.load.login import complete_login
+from tests.load.config import HOST
 
 
 def get_rand_string(N=10):
@@ -31,6 +31,7 @@ def encrypt_data(data):
 
 def get_rand_item_data():
     return {
+        "customItemFields": [],
         "title": encrypt_data(get_rand_string(10)),
         "description": encrypt_data(get_rand_string(20)),
         "username": encrypt_data(get_rand_string(10)),
@@ -67,6 +68,7 @@ class NormalUser(HttpUser):
         def read_vaults(self):
             response = self.client.get("/users/me/vaults", cookies=self.user.cookies)
             self.vault_list = response.json()
+            # print(self.vault_list, response.status_code)
             self.read_items()
 
         @task(1)
@@ -80,7 +82,7 @@ class NormalUser(HttpUser):
                 # Check if the status code is 503
                 if response.status_code == 503:
                     print("Received a 503 Service Unavailable error")
-                    print(response.headers, response.text)
+                    # print(response.headers, response.text)
                 else:
                     self.vault_items[vault["id"]] = response.json()
 
@@ -97,7 +99,7 @@ class NormalUser(HttpUser):
                 data=json_str,
                 name="/users/me/vaults",
             )
-            # print("create vault", response.status_code)
+            # print("create vault", response.text, response.status_code)
             self.read_vaults()
 
         @task(8)
@@ -184,7 +186,7 @@ class NormalUser(HttpUser):
     def on_start(self):
         # self.email = f"{get_rand_string(8)}.warmup@terafill.com"
         self.email = f"{get_rand_string(8)}.load@terafill.com"
-        self.password = get_rand_string(10)
+        self.password = "test"#get_rand_string(10)
 
         new_signup(
             requests=self.client,
@@ -207,7 +209,7 @@ class NormalUser(HttpUser):
         }
 
     def on_stop(self):
-        from database import SessionLocal
+        from tests.load.database import SessionLocal
         from app.models.user import User
         from app.models.encryption_key import EncryptionKey
         from app.models.item import Item
@@ -215,8 +217,8 @@ class NormalUser(HttpUser):
         from app.models.srp_data import SRPData
         from app.models.key_wrapping_key import KeyWrappingKey
         from app.models.vault import Vault
-        
-        time.sleep(1)
+
+        # time.sleep(1)
         # db = SessionLocal()
 
         # with db.begin():

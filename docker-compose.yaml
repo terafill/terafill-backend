@@ -1,0 +1,157 @@
+version: '3.8'
+
+services:
+  terafill_mysql:
+    image: terafill-mysql
+    # build:
+    #   context: .
+    #   dockerfile: db.Dockerfile
+    ports:
+      - "3306:3306"
+    # cpuset: "8-8"
+    # mem_limit: 4g
+    networks:
+      - terafill-network
+
+  terafill_backend:
+    image: terafill-backend
+    deploy:
+      mode: replicated
+      replicas: 4
+    environment:
+      MYSQL_HOST: terafill_mysql
+      MYSQL_PORT: 3306
+      PORT: 8000
+      WORKERS: 2
+    ports:
+      - "8000:8000"
+    # cpuset: "0-1"
+    # mem_limit: 2g
+    networks:
+      - terafill-network
+    depends_on:
+      - terafill_mysql
+      - consul1
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    ports:
+      - "3000:3000"
+    # cpuset: "10-10"
+    # mem_limit: 2g
+    networks:
+      - terafill-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    ports:
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+      - "14250:14250"
+      - "14268:14268"
+      - "14269:14269"
+      - "9411:9411"
+    # cpuset: "10-10"
+    # mem_limit: 4g
+    networks:
+      - terafill-network
+
+  terafill_nginx:
+    image: nginx-consul
+    # build:
+    #   context: ./nginx
+    #   dockerfile: nginx.Dockerfile
+    ports:
+      - "8001:8001"
+    # cpuset: "9-9"
+    # mem_limit: 2g
+    networks:
+      - terafill-network
+    volumes:
+      #      consul-template templates
+      - "./nginx/terafill_backend_nginx.conf:/etc/consul-template/templates/terafill_backend_nginx.conf"
+      #      consul-template config
+      - "./consul/default.conf:/etc/consul-template/conf/default.conf"
+      #      nginx config
+      - "./nginx/nginx.conf:/etc/nginx/nginx.conf"
+    depends_on:
+      - consul1
+
+  consul1:
+    image: hashicorp/consul:latest
+    command: consul agent -dev -client=0.0.0.0 -ui
+    # command: consul agent -server -client=0.0.0.0 -bootstrap-expect=3 -data-dir=/tmp/consul -ui
+    # command: >
+    #   sh -c "
+    #   IP_ADDRESS=$$(hostname -i | cut -d' ' -f1) &&
+    #   consul agent -server -client=0.0.0.0 -bootstrap-expect=3 -bind=$$IP_ADDRESS -advertise=$$IP_ADDRESS -data-dir=/tmp/consul -ui
+    #   "
+    hostname: consul1
+    ports:
+      - "8301:8300"
+      - "8401:8400"
+      - "8501:8500"
+      - "8601:8600"
+      - "9001:9001"
+    networks:
+      - terafill-network
+
+  # consul2:
+  #   image: hashicorp/consul:latest
+  #   command: >
+  #     sh -c "
+  #     IP_ADDRESS=$$(hostname -i | cut -d' ' -f1) &&
+  #     consul agent -server -client=0.0.0.0 -bootstrap-expect=3  -rejoin -retry-join=consul1 -bind=$$IP_ADDRESS -advertise=$$IP_ADDRESS -data-dir=/tmp/consul -ui
+  #     "    
+  #   # command: consul agent -server -client=0.0.0.0 -bootstrap-expect=3 -rejoin -retry-join=consul1 -data-dir=/tmp/consul -ui
+  #   hostname: consul2
+  #   networks:
+  #     - terafill-network
+  #   ports:
+  #     - "8302:8300"
+  #     - "8402:8400"
+  #     - "8502:8500"
+  #     - "8602:8600"
+  #     - "9002:9001"
+  #   depends_on:
+  #     - consul1
+
+  # consul3:
+  #   image: hashicorp/consul:latest
+  #   # command: consul agent -server -client=0.0.0.0 -bootstrap-expect=3 -rejoin -retry-join=consul1 -data-dir=/tmp/consul -ui
+  #   command: >
+  #     sh -c "
+  #     IP_ADDRESS=$$(hostname -i | cut -d' ' -f1) &&
+  #     consul agent -server -client=0.0.0.0 -bootstrap-expect=3  -rejoin -retry-join=consul1 -bind=$$IP_ADDRESS -advertise=$$IP_ADDRESS -data-dir=/tmp/consul -ui
+  #     "    
+  #   hostname: consul3
+  #   networks:
+  #     - terafill-network
+  #   ports:
+  #     - "8303:8300"
+  #     - "8403:8400"
+  #     - "8503:8500"
+  #     - "8603:8600"
+  #     - "9003:9001"
+  #   depends_on:
+  #     - consul1
+
+  registrator:
+    image: gliderlabs/registrator:latest
+    command: consul://consul1:8500
+    networks:
+      - terafill-network
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock
+    # networks:
+    #   - host
+    depends_on:
+      - consul1   
+
+networks:
+  terafill-network:
+    driver: overlay

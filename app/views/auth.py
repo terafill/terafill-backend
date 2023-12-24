@@ -28,7 +28,7 @@ from ..utils.security import (
     get_session_token,
     get_session_details,
 )
-from ..utils.otel import tracer
+# from ..utils.otel import tracer
 
 
 router = APIRouter()

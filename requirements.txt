@@ -3,7 +3,7 @@ boto3
 uvicorn
 pyjwt
 pydantic
-sqlalchemy
+sqlalchemy==1.4.50
 pymysql
 mysql-connector-python
 passlib
@@ -20,3 +20,4 @@ opentelemetry-instrumentation-fastapi
 opentelemetry-exporter-jaeger
 hypercorn
 mysqlclient
+gunicorn
