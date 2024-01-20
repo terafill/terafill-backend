@@ -57,7 +57,7 @@ def send_verification_code(email: str, verification_code):
     """Function to send email verification code using AWS SES"""
 
     sender = "harshitsaini15@gmail.com"
-    subject = "Email Verification Code"
+    subject = "Terafill Email Verification Code"
     message = f"Your verification code is {verification_code}"
 
     try:
