@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"math/rand"
 	"strconv"
+	"time"
 
 	"github.com/1Password/srp"
 	"github.com/aws/aws-sdk-go/service/ses"
@@ -641,6 +642,84 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 			"serverProof":    serverProof_hex,
 			"keyWrappingKey": keyWrappingKey.EncryptedPrivateKey,
 			"sessionToken":   session.SessionToken,
+		})
+	})
+
+	app.Get("/auth/status", func(c *fiber.Ctx) error {
+
+		var ctx context.Context = c.Context()
+
+		// Get a Tx for making transaction requests.
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+		// Defer a rollback in case anything fails.
+		defer tx.Rollback()
+
+		cookies := new(struct {
+			SessionId        string `cookie:"sessionId"`
+			PlatformClientId string `cookie:"platformClientId"`
+			UserId           string `cookie:"userId"`
+			SessionToken     string `cookie:"sessionToken"`
+		})
+		c.CookieParser(cookies)
+
+		sessionId := cookies.SessionId
+		platformClientId := cookies.PlatformClientId
+		sessionToken := cookies.SessionToken
+
+		fmt.Printf("Session Id found from cookies %v\n", sessionId)
+
+		session, err := crud.GetSession(ctx, db, sessionId)
+
+		loggedIn := true
+
+		if err == nil { // A valid session is found
+			if session.ID != sessionId {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"err": "Invalid Session. Please login again.",
+				})
+			}
+
+			if session.SessionToken != sessionToken {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"err": "Invalid Session Token. Please login again.",
+				})
+			}
+			if time.Now().UTC().After(session.ExpiryAt) {
+
+				_, err = crud.ExpireActiveSessions(ctx, db, platformClientId, sessionId)
+				if err != nil {
+					log.Fatal("Session Activation not successful", err.Error())
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"err": "Session Activation not successful",
+					})
+				}
+				c.ClearCookie("sessionToken")
+				c.ClearCookie("sessionId")
+				c.ClearCookie("userId")
+				loggedIn = false
+			}
+		} else { // No session found
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"err": err.Error(),
+				})
+			}
+		}
+
+		// Commit the transaction.
+		if err = tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusOK).JSON(&fiber.Map{
+			"loggedIn": loggedIn,
 		})
 	})
 
