@@ -1,6 +1,7 @@
 import json
 
 # import requests
+import srptools
 from srptools import SRPContext, SRPClientSession
 
 
@@ -10,18 +11,27 @@ def complete_login(requests, email, password, base_url):
     json_str = json.dumps(data)
     response = requests.post(
         base_url + route,
-        data=json_str,
+        json=data,        
+        # data=json_str,
         headers={"client-id": "b980b13c-4db8-4e8a-859c-4544fd70825f"},
     )
 
     if response.status_code == 503:
         print("Received a 503 Service Unavailable error")
-        print(response.headers, response.text)
+        # print(response.headers, response.text)
     else:
+        # print("Login response", response.json())
         salt = response.json()["salt"]
 
     # Receive server public and salt and process them.
-    client_session = SRPClientSession(SRPContext(email, password))
+    client_session = SRPClientSession(SRPContext(
+        email,
+        password,
+        bits_salt=128,
+        bits_random=256,
+        prime=srptools.constants.PRIME_2048,
+        hash_func=srptools.constants.HASH_SHA_256,
+        generator=srptools.constants.PRIME_2048_GEN))
 
     # Generate client public and session key.
     client_public = client_session.public
@@ -31,7 +41,8 @@ def complete_login(requests, email, password, base_url):
     json_str = json.dumps(data)
     login_response = requests.post(
         base_url + route,
-        data=json_str,
+        json=data,
+        # data=json_str,
         headers={"client-id": "b980b13c-4db8-4e8a-859c-4544fd70825f"},
     )
 
@@ -42,7 +53,7 @@ def complete_login(requests, email, password, base_url):
     # , sep="\n")
     if login_response.status_code == 503:
         print("login_response: Received a 503 Service Unavailable error")
-        print(login_response.headers, response.text)
+        # print(login_response.headers, response.text)
     else:
         login_response.json()
 
@@ -64,7 +75,8 @@ def complete_login(requests, email, password, base_url):
     json_str = json.dumps(data)
     login_confirm_response = requests.post(
         base_url + route,
-        data=json_str,
+        json=data,
+        # data=json_str,
         headers={"client-id": "b980b13c-4db8-4e8a-859c-4544fd70825f"},
         cookies={
             "platformClientId": login_response.cookies.get("platformClientId"),
@@ -74,7 +86,7 @@ def complete_login(requests, email, password, base_url):
 
     if login_confirm_response.status_code == 503:
         print("login_confirm_response: Received a 503 Service Unavailable error")
-        print(login_confirm_response.headers, response.text)
+        # print(login_confirm_response.headers, response.text)
     else:
         login_confirm_response.json()
 

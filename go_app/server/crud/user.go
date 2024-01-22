@@ -43,7 +43,7 @@ func CreateUser(ctx context.Context, db *sql.DB, user *schemas.User) (*schemas.U
 
 func UpdateUser(ctx context.Context, db *sql.DB, updatedUser *schemas.User) (bool, error) {
 
-	fmt.Printf("New updated user is: %v", updatedUser)
+	// fmt.Printf("New updated user is: %v", updatedUser)
 
 	_, err := db.ExecContext(
 		ctx, "UPDATE users SET status=?, email_verification_code=?;", updatedUser.Status, updatedUser.EmailVerificationCode)

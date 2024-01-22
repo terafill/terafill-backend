@@ -78,7 +78,13 @@ func SetupDB() *sql.DB {
 }
 
 func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		Prefork: true,
+	})
+
+	app.Get("/hello", func(c *fiber.Ctx) error {
+		return c.SendString("Hello!")
+	})
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		// return c.SendString("Hello, World 👋!")
@@ -103,10 +109,10 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 		c.BodyParser(&user)
 
 		email := user.Email
-		fmt.Printf("Email to be signed up: %v", email)
+		// fmt.Printf("Email to be signed up: %v", email)
 		var userType string = ""
 		user, err = crud.GetUserByEmail(ctx, db, email)
-		fmt.Println("User found is", user, err)
+		// fmt.Println("User found is", user, err)
 		if err != nil { // new user
 			userData := schemas.User{
 				Email:  email,
@@ -118,7 +124,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 			userType = user.Status
 		}
 
-		fmt.Println("userType ", userType)
+		// fmt.Println("userType ", userType)
 
 		q := c.Queries()
 
@@ -133,14 +139,14 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 
 			mock, _ := strconv.ParseBool(q["mock"])
 
-			fmt.Printf("Verification will be sent: %d\n", verificationCode)
+			// fmt.Printf("Verification will be sent: %d\n", verificationCode)
 
 			var awsClient *utils.AWSClient
 
 			if mock != true {
 				utils.SendVerificationCode(awsClient, sesClient, email, verificationCode)
 			} else {
-				fmt.Print("SendVerificationCode not triggered")
+				// fmt.Println("SendVerificationCode not triggered")
 			}
 
 			user.EmailVerificationCode = verificationCode
@@ -148,7 +154,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 
 			// fmt.Println("Updated user", updatedUser, user)
 			ok, err = crud.UpdateUser(ctx, db, user)
-			fmt.Println("err", err)
+			// fmt.Println("err", err)
 			if ok != true {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"err": err.Error(),
@@ -192,22 +198,22 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 		c.BodyParser(&confirmationRequest)
 
 		email := confirmationRequest.Email
-		fmt.Printf("Email to be signed up: %v", email)
+		// fmt.Printf("Email to be signed up: %v", email)
 		// var userType string = ""
 		user, err := crud.GetUserByEmail(ctx, db, email)
-		fmt.Println("User found is", user, err)
+		// fmt.Println("User found is", user, err)
 		if err != nil { // new user
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"err": "User not found.",
 			})
 		}
 
-		fmt.Println("userType ", user.Status)
+		// fmt.Println("userType ", user.Status)
 
 		user.Status = "confirmed"
 
 		ok, err := crud.UpdateUser(ctx, db, user)
-		fmt.Println("err", err)
+		// fmt.Println("err", err)
 		if ok != true {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"err": err.Error(),
@@ -279,10 +285,10 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 		c.BodyParser(&saltRequest)
 
 		email := saltRequest.Email
-		fmt.Printf("Email requested is: %v", email)
+		// fmt.Printf("Email requested is: %v", email)
 
 		user, err := crud.GetUserByEmail(ctx, db, email)
-		fmt.Println("User found is", user, err)
+		// fmt.Println("User found is", user, err)
 		if err != nil { // User not found
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"err": "User not found.",
@@ -304,7 +310,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 		}
 
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"Salt": srpData.Salt,
+			"salt": srpData.Salt,
 		})
 	})
 
@@ -330,11 +336,11 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 
 		email := loginRequest.Email
 		clientPublicKey := loginRequest.ClientPublicKey
-		fmt.Printf("Email requested is: %v\n", email)
-		fmt.Printf("ClientPublicKey requested is: %v\n", clientPublicKey)
+		// fmt.Printf("Email requested is: %v\n", email)
+		// fmt.Printf("ClientPublicKey requested is: %v\n", clientPublicKey)
 
 		user, err := crud.GetUserByEmail(ctx, db, email)
-		fmt.Println("User found is", user, err)
+		// fmt.Println("User found is", user, err)
 		if err != nil { // User not found
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"err": "User not found.",
@@ -372,7 +378,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 			})
 		}
 
-		fmt.Println("Server was initialized!")
+		// fmt.Println("Server was initialized!")
 
 		if err = server.SetOthersPublic(A); err != nil {
 			log.Fatal(err)
@@ -381,7 +387,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 			})
 		}
 
-		fmt.Println("Client's public key was setup!")
+		// fmt.Println("Client's public key was setup!")
 
 		var B *big.Int
 
@@ -393,7 +399,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 		}
 
 		B_hex := hex.EncodeToString(B.Bytes())
-		fmt.Println("Server's public key was generated!")
+		// fmt.Println("Server's public key was generated!")
 
 		// server can now make the key.
 		sessionKey, err := server.Key()
@@ -407,7 +413,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 		sessionKey_hex := hex.EncodeToString(sessionKey)
 
 		headers := c.GetReqHeaders()
-		fmt.Println("headers", headers)
+		// fmt.Println("headers", headers)
 		clientId := headers["Client-Id"][0]
 		serverPrivateKey := server.EphemeralPrivate()
 		serverPrivateKey_hex := hex.EncodeToString(serverPrivateKey.Bytes())
@@ -478,11 +484,11 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 
 		email := loginConfirmationRequest.Email
 		clientProof := loginConfirmationRequest.ClientProof
-		fmt.Printf("Email requested is: %v\n", email)
-		fmt.Printf("Client Proof requested is: %v\n", clientProof)
+		// fmt.Printf("Email requested is: %v\n", email)
+		// fmt.Printf("Client Proof requested is: %v\n", clientProof)
 
 		user, err := crud.GetUserByEmail(ctx, db, email)
-		fmt.Println("User found is", user, err)
+		// fmt.Println("User found is", user, err)
 		if err != nil { // User not found
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"err": "User not found.",
@@ -497,7 +503,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 
 		sessionId := cookies.SessionId
 
-		fmt.Printf("Session Id found from cookies %v\n", sessionId)
+		// fmt.Printf("Session Id found from cookies %v\n", sessionId)
 
 		session, err := crud.GetSession(ctx, db, sessionId)
 
@@ -531,7 +537,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 				})
 			}
 
-			fmt.Println("Server was initialized!")
+			// fmt.Println("Server was initialized!")
 			// fmt.Println("session.SrpClientPublicKey", session.SrpClientPublicKey)
 			// fmt.Println("A: ", A)
 			// fmt.Println("V: ", v)
@@ -543,10 +549,10 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 				})
 			}
 
-			fmt.Println("Client's public key was setup!")
+			// fmt.Println("Client's public key was setup!")
 
 			mySecret_hex := session.SrpServerPrivateKey
-			fmt.Printf("Try mySecret_hex: %v\n", mySecret_hex)
+			// fmt.Printf("Try mySecret_hex: %v\n", mySecret_hex)
 			mySecret := new(big.Int)
 			mySecret.SetString(mySecret_hex, 16)
 			err = server.SetMySecret(mySecret)
@@ -557,7 +563,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 				})
 			}
 
-			fmt.Print("Server private key was setup!\n")
+			// fmt.Print("Server private key was setup!\n")
 
 			var B *big.Int
 
@@ -569,7 +575,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 			}
 
 			// B_hex := hex.EncodeToString(B.Bytes())
-			fmt.Println("Server's public key was generated!")
+			// fmt.Println("Server's public key was generated!")
 
 			// server can now make the key.
 			sessionKey, err := server.Key()
@@ -611,12 +617,12 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 
 		keyWrappingKey, err := crud.GetKeyWrappingKey(ctx, db, userId)
 
-		_, err = crud.ExpireActiveSessions(ctx, db, session.PlatformClientId, sessionId)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"err": "Session Expiration not successful",
-			})
-		}
+		// _, err = crud.ExpireActiveSessions(ctx, db, session.PlatformClientId, sessionId)
+		// if err != nil {
+		// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+		// 		"err": "Session Expiration not successful",
+		// 	})
+		// }
 
 		_, err = crud.ActivateSession(ctx, db, sessionId)
 		if err != nil {
@@ -671,7 +677,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 		platformClientId := cookies.PlatformClientId
 		sessionToken := cookies.SessionToken
 
-		fmt.Printf("Session Id found from cookies %v\n", sessionId)
+		// fmt.Printf("Session Id found from cookies %v\n", sessionId)
 
 		session, err := crud.GetSession(ctx, db, sessionId)
 
@@ -690,6 +696,7 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 				})
 			}
 			if time.Now().UTC().After(session.ExpiryAt) {
+				fmt.Println("time.Now().UTC().After(session.ExpiryAt) triggered inside /auth/status")
 
 				_, err = crud.ExpireActiveSessions(ctx, db, platformClientId, sessionId)
 				if err != nil {
@@ -721,6 +728,463 @@ func SetupApp(db *sql.DB, sesClient *ses.SES) *fiber.App {
 		return c.Status(fiber.StatusOK).JSON(&fiber.Map{
 			"loggedIn": loggedIn,
 		})
+	})
+
+	app.Get("/users/me/vaults", func(c *fiber.Ctx) error {
+
+		var ctx context.Context = c.Context()
+
+		// Get a Tx for making transaction requests.
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+		// Defer a rollback in case anything fails.
+		defer tx.Rollback()
+
+		cookies := new(struct {
+			SessionId string `cookie:"sessionId"`
+			// PlatformClientId string `cookie:"platformClientId"`
+			UserId       string `cookie:"userId"`
+			SessionToken string `cookie:"sessionToken"`
+		})
+		c.CookieParser(cookies)
+
+		sessionId := cookies.SessionId
+		// platformClientId := cookies.PlatformClientId
+		sessionToken := cookies.SessionToken
+		userId := cookies.UserId
+
+		userId, err = utils.GetCurrentUser(c, ctx, db, sessionId, sessionToken, userId)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		vaults, err := crud.GetVaultsByUserId(ctx, db, userId)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Commit the transaction.
+		if err = tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusCreated).JSON(&vaults)
+	})
+
+	app.Post("/users/me/vaults", func(c *fiber.Ctx) error {
+
+		var ctx context.Context = c.Context()
+
+		// Get a Tx for making transaction requests.
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+		// Defer a rollback in case anything fails.
+		defer tx.Rollback()
+
+		cookies := new(struct {
+			SessionId string `cookie:"sessionId"`
+			// PlatformClientId string `cookie:"platformClientId"`
+			UserId       string `cookie:"userId"`
+			SessionToken string `cookie:"sessionToken"`
+		})
+		c.CookieParser(cookies)
+
+		sessionId := cookies.SessionId
+		// platformClientId := cookies.PlatformClientId
+		sessionToken := cookies.SessionToken
+		userId := cookies.UserId
+
+		userId, err = utils.GetCurrentUser(c, ctx, db, sessionId, sessionToken, userId)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Create deafult vault
+		vault := new(schemas.Vault)
+		c.BodyParser(&vault)
+
+		vault.UserID = userId
+
+		err = crud.CreateVault(ctx, db, vault)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Commit the transaction.
+		if err = tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusCreated).JSON(&vault)
+	})
+
+	app.Put("/users/me/vaults/:vaultId", func(c *fiber.Ctx) error {
+
+		var ctx context.Context = c.Context()
+
+		// Get a Tx for making transaction requests.
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+		// Defer a rollback in case anything fails.
+		defer tx.Rollback()
+
+		cookies := new(struct {
+			SessionId string `cookie:"sessionId"`
+			// PlatformClientId string `cookie:"platformClientId"`
+			UserId       string `cookie:"userId"`
+			SessionToken string `cookie:"sessionToken"`
+		})
+		c.CookieParser(cookies)
+
+		sessionId := cookies.SessionId
+		// platformClientId := cookies.PlatformClientId
+		sessionToken := cookies.SessionToken
+		userId := cookies.UserId
+
+		userId, err = utils.GetCurrentUser(c, ctx, db, sessionId, sessionToken, userId)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		vaultId := c.Params("vaultId")
+
+		// Create deafult vault
+		vault := new(schemas.Vault)
+		c.BodyParser(&vault)
+
+		vault.UserID = userId
+		vault.ID = vaultId
+
+		err = crud.UpdateVault(ctx, db, vault)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Commit the transaction.
+		if err = tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusOK).JSON(&vault)
+	})
+
+	app.Delete("/users/me/vaults/:vaultId", func(c *fiber.Ctx) error {
+
+		var ctx context.Context = c.Context()
+
+		// Get a Tx for making transaction requests.
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+		// Defer a rollback in case anything fails.
+		defer tx.Rollback()
+
+		cookies := new(struct {
+			SessionId string `cookie:"sessionId"`
+			// PlatformClientId string `cookie:"platformClientId"`
+			UserId       string `cookie:"userId"`
+			SessionToken string `cookie:"sessionToken"`
+		})
+		c.CookieParser(cookies)
+
+		sessionId := cookies.SessionId
+		// platformClientId := cookies.PlatformClientId
+		sessionToken := cookies.SessionToken
+		userId := cookies.UserId
+
+		userId, err = utils.GetCurrentUser(c, ctx, db, sessionId, sessionToken, userId)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		vaultId := c.Params("vaultId")
+
+		err = crud.DeleteVault(ctx, db, vaultId)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Commit the transaction.
+		if err = tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusNoContent).JSON(&fiber.Map{})
+	})
+
+	app.Post("/users/me/vaults/:vaultId/items", func(c *fiber.Ctx) error {
+
+		var ctx context.Context = c.Context()
+
+		// Get a Tx for making transaction requests.
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+		// Defer a rollback in case anything fails.
+		defer tx.Rollback()
+
+		cookies := new(struct {
+			SessionId string `cookie:"sessionId"`
+			// PlatformClientId string `cookie:"platformClientId"`
+			UserId       string `cookie:"userId"`
+			SessionToken string `cookie:"sessionToken"`
+		})
+		c.CookieParser(cookies)
+
+		sessionId := cookies.SessionId
+		// platformClientId := cookies.PlatformClientId
+		sessionToken := cookies.SessionToken
+		userId := cookies.UserId
+
+		userId, err = utils.GetCurrentUser(c, ctx, db, sessionId, sessionToken, userId)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Create deafult vault
+		item := new(schemas.Item)
+		c.BodyParser(&item)
+
+		vaultId := c.Params("vaultId")
+
+		item.VaultID = vaultId
+		item.UserID = userId
+
+		err = crud.CreateItem(ctx, db, item)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		err = crud.CreateEncryptionKey(ctx, db, item.ID, item.UserID, item.EncryptedEncryptionKey)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Commit the transaction.
+		if err = tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusCreated).JSON(&item)
+	})
+
+	app.Get("/users/me/vaults/:vaultId/items", func(c *fiber.Ctx) error {
+
+		var ctx context.Context = c.Context()
+
+		// Get a Tx for making transaction requests.
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+		// Defer a rollback in case anything fails.
+		defer tx.Rollback()
+
+		cookies := new(struct {
+			SessionId string `cookie:"sessionId"`
+			// PlatformClientId string `cookie:"platformClientId"`
+			UserId       string `cookie:"userId"`
+			SessionToken string `cookie:"sessionToken"`
+		})
+		c.CookieParser(cookies)
+
+		sessionId := cookies.SessionId
+		// platformClientId := cookies.PlatformClientId
+		sessionToken := cookies.SessionToken
+		userId := cookies.UserId
+
+		userId, err = utils.GetCurrentUser(c, ctx, db, sessionId, sessionToken, userId)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		vaultId := c.Params("vaultId")
+
+		items, err := crud.GetItemsFull(ctx, db, userId, vaultId)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Commit the transaction.
+		if err = tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusCreated).JSON(&items)
+	})
+
+	app.Put("/users/me/vaults/:vaultId/items/:itemId", func(c *fiber.Ctx) error {
+
+		var ctx context.Context = c.Context()
+
+		// Get a Tx for making transaction requests.
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+		// Defer a rollback in case anything fails.
+		defer tx.Rollback()
+
+		cookies := new(struct {
+			SessionId string `cookie:"sessionId"`
+			// PlatformClientId string `cookie:"platformClientId"`
+			UserId       string `cookie:"userId"`
+			SessionToken string `cookie:"sessionToken"`
+		})
+		c.CookieParser(cookies)
+
+		sessionId := cookies.SessionId
+		// platformClientId := cookies.PlatformClientId
+		sessionToken := cookies.SessionToken
+		userId := cookies.UserId
+
+		userId, err = utils.GetCurrentUser(c, ctx, db, sessionId, sessionToken, userId)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Create deafult vault
+		item := new(schemas.Item)
+		c.BodyParser(&item)
+
+		vaultId := c.Params("vaultId")
+		itemId := c.Params("itemId")
+
+		item.VaultID = vaultId
+		item.UserID = userId
+		item.ID = itemId
+
+		err = crud.UpdateItem(ctx, db, item)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Commit the transaction.
+		if err = tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusOK).JSON(&item)
+	})
+
+	app.Delete("/users/me/vaults/:vaultId/items/:itemId", func(c *fiber.Ctx) error {
+
+		var ctx context.Context = c.Context()
+
+		// Get a Tx for making transaction requests.
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+		// Defer a rollback in case anything fails.
+		defer tx.Rollback()
+
+		cookies := new(struct {
+			SessionId string `cookie:"sessionId"`
+			// PlatformClientId string `cookie:"platformClientId"`
+			UserId       string `cookie:"userId"`
+			SessionToken string `cookie:"sessionToken"`
+		})
+		c.CookieParser(cookies)
+
+		sessionId := cookies.SessionId
+		// platformClientId := cookies.PlatformClientId
+		sessionToken := cookies.SessionToken
+		userId := cookies.UserId
+
+		userId, err = utils.GetCurrentUser(c, ctx, db, sessionId, sessionToken, userId)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// vaultId := c.Params("vaultId")
+		itemId := c.Params("itemId")
+
+		err = crud.DeleteItem(ctx, db, itemId)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		// Commit the transaction.
+		if err = tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"err": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusNoContent).JSON(&fiber.Map{})
 	})
 
 	return app

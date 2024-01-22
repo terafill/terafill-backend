@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"time"
 
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -17,6 +18,7 @@ import (
 
 	"gopkg.in/square/go-jose.v2"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"terafill.com/m/server/crud"
 	"terafill.com/m/server/schemas"
@@ -189,7 +191,7 @@ func BuildSession(ctx context.Context, db *sql.DB, userId string, clientId strin
 		return nil, err
 	}
 
-	fmt.Printf("Session token: %v", sessionToken)
+	// fmt.Printf("Session token: %v", sessionToken)
 
 	// Update user status and profile data
 	session := &schemas.Session{
@@ -207,4 +209,48 @@ func BuildSession(ctx context.Context, db *sql.DB, userId string, clientId strin
 	crud.CreateSession(ctx, db, session)
 
 	return session, nil
+}
+
+func GetCurrentUser(c *fiber.Ctx, ctx context.Context, db *sql.DB, sessionId string, sessionToken string, userId string) (string, error) {
+	session, err := crud.GetSession(ctx, db, sessionId)
+
+	if userId == "" {
+		return userId, fmt.Errorf("User id missing")
+	}
+
+	if sessionId == "" {
+		return userId, fmt.Errorf("Session Id missing")
+	}
+
+	if sessionToken == "" {
+		return userId, fmt.Errorf("Session token missing")
+	}
+
+	if err == nil { // A valid session is found
+		if session.ID != sessionId {
+			return userId, fmt.Errorf("Invalid Session. Please login again.")
+		}
+
+		if session.SessionToken != sessionToken {
+			return userId, fmt.Errorf("Invalid Session Token. Token has expired or is inactive.")
+		}
+
+		if time.Now().UTC().After(session.ExpiryAt) {
+			fmt.Printf("time.Now().UTC().After(session.ExpiryAt) got triggered!!!\n")
+
+			_, err = crud.ExpireActiveSessions(ctx, db, session.PlatformClientId, sessionId)
+			if err != nil {
+				log.Fatal("Session Activation not successful", err.Error())
+				return userId, fmt.Errorf("Session Activation not successful")
+			}
+			c.ClearCookie("sessionToken")
+			c.ClearCookie("sessionId")
+			c.ClearCookie("userId")
+		}
+	} else { // No session found
+		if err != nil {
+			return userId, err
+		}
+	}
+	return userId, nil
 }

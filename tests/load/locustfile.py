@@ -44,7 +44,8 @@ def get_rand_item_data():
 
 
 class NormalUser(HttpUser):
-    host = f"{HOST}/api/v1"
+    # host = f"{HOST}/api/v1"
+    host = f"{HOST}"
     wait_time = between(1, 5)
     login_data = {}
     cookies = {}
@@ -58,6 +59,7 @@ class NormalUser(HttpUser):
     @task
     def login_status(self):
         response = self.client.get("/auth/status", cookies=self.cookies)
+        print(response, response.text)
 
     @task
     class LoggedInUser(TaskSet):
@@ -67,8 +69,8 @@ class NormalUser(HttpUser):
         @task(1)
         def read_vaults(self):
             response = self.client.get("/users/me/vaults", cookies=self.user.cookies)
+            # print("Get vaults", response.status_code, response.text)
             self.vault_list = response.json()
-            # print(self.vault_list, response.status_code)
             self.read_items()
 
         @task(1)
@@ -96,7 +98,8 @@ class NormalUser(HttpUser):
             response = self.client.post(
                 "/users/me/vaults",
                 cookies=self.user.cookies,
-                data=json_str,
+                json=data,
+                # data=json_str,
                 name="/users/me/vaults",
             )
             # print("create vault", response.text, response.status_code)
@@ -116,7 +119,8 @@ class NormalUser(HttpUser):
                 response = self.client.put(
                     f"/users/me/vaults/{vault['id']}",
                     cookies=self.user.cookies,
-                    data=json_str,
+                    json=data,
+                    # data=json_str,
                     name="/users/me/vaults/{vault_id}",
                 )
                 # print("update vault", response.status_code)
@@ -146,7 +150,8 @@ class NormalUser(HttpUser):
                 response = self.client.post(
                     f"/users/me/vaults/{vault['id']}/items",
                     cookies=self.user.cookies,
-                    data=json_str,
+                    json=data,                    
+                    # data=json_str,
                     name="/users/me/vaults/{vault_id}/items",
                 )
                 # print("create vault item", response.status_code)
@@ -163,7 +168,8 @@ class NormalUser(HttpUser):
                     response = self.client.put(
                         f"/users/me/vaults/{vault['id']}/items/{item['id']}",
                         cookies=self.user.cookies,
-                        data=json_str,
+                        json=data,
+                        # data=json_str,
                         name="/users/me/vaults/{vault_id}/items/{item_id}",
                     )
                     # print("update vault item", response.status_code)
@@ -188,6 +194,8 @@ class NormalUser(HttpUser):
         self.email = f"{get_rand_string(8)}.load@terafill.com"
         self.password = "test"#get_rand_string(10)
 
+        print(self.email)
+
         new_signup(
             requests=self.client,
             base_url=self.host,
@@ -208,38 +216,38 @@ class NormalUser(HttpUser):
             "sessionId": self.login_data["session_id"],
         }
 
-    def on_stop(self):
-        from tests.load.database import SessionLocal
-        from app.models.user import User
-        from app.models.encryption_key import EncryptionKey
-        from app.models.item import Item
-        from app.models.session import Session
-        from app.models.srp_data import SRPData
-        from app.models.key_wrapping_key import KeyWrappingKey
-        from app.models.vault import Vault
+    # def on_stop(self):
+    #     from tests.load.database import SessionLocal
+    #     from app.models.user import User
+    #     from app.models.encryption_key import EncryptionKey
+    #     from app.models.item import Item
+    #     from app.models.session import Session
+    #     from app.models.srp_data import SRPData
+    #     from app.models.key_wrapping_key import KeyWrappingKey
+    #     from app.models.vault import Vault
 
-        # time.sleep(1)
-        # db = SessionLocal()
+    #     time.sleep(1)
+    #     db = SessionLocal()
 
-        # with db.begin():
-        #     try:
-        #         user = db.query(User).filter(User.email == self.email).first()
-        #         if user:
-        #             user_id = user.id
-        #             response = self.client.delete(
-        #                 self.host + f"/users/{user_id}",
-        #                 cookies=self.cookies,
-        #                 name="/users/{user_id}",
-        #             )
-        #             if response.status_code == 204:
-        #                 print(f"User {self.email} deleted successfully.", response)
-        #             else:
-        #                 print(response.text)
-        #                 print(f"User {self.email} deletion failed.", response)
-        #         else:
-        #             print("User not found")
-        #     except Exception as e:
-        #         db.close()
-        #         raise
-        #     finally:
-        #         db.close()
+    #     with db.begin():
+    #         try:
+    #             user = db.query(User).filter(User.email == self.email).first()
+    #             if user:
+    #                 user_id = user.id
+    #                 response = self.client.delete(
+    #                     self.host + f"/users/{user_id}",
+    #                     cookies=self.cookies,
+    #                     name="/users/{user_id}",
+    #                 )
+    #                 if response.status_code == 204:
+    #                     print(f"User {self.email} deleted successfully.", response)
+    #                 else:
+    #                     print(response.text)
+    #                     print(f"User {self.email} deletion failed.", response)
+    #             else:
+    #                 print("User not found")
+    #         except Exception as e:
+    #             db.close()
+    #             raise
+    #         finally:
+    #             db.close()

@@ -53,7 +53,8 @@ def new_signup(requests, base_url, email, password):
 
     signup_response = requests.post(
         base_url + route,
-        data=json_str,
+        json=data,
+        # data=json_str,
         headers={"client-id": "b980b13c-4db8-4e8a-859c-4544fd70825f"},
     )
 
@@ -72,7 +73,14 @@ def new_signup(requests, base_url, email, password):
             hashed_password.encode()
         ),
     )
-    context = SRPContext(email, password)
+    context = SRPContext(
+        email,
+        password,   
+        bits_salt=128,
+        bits_random=256,
+        prime=srptools.constants.PRIME_2048,
+        hash_func=srptools.constants.HASH_SHA_256,
+        generator=srptools.constants.PRIME_2048_GEN)
     username, password_verifier, salt = context.get_user_data_triplet()
 
     verification_code = get_verification_code(email)
@@ -91,11 +99,12 @@ def new_signup(requests, base_url, email, password):
 
     signup_confirmation_response = requests.post(
         base_url + route,
-        data=json_str,
+        json=data,
+        # data=json_str,
         headers={"client-id": "b980b13c-4db8-4e8a-859c-4544fd70825f"},
     )
 
-    if signup_confirmation_response.status_code == 200:
+    if signup_confirmation_response.status_code in (200, 201, 204):
         print(f"Signup complete for email: {email}")
     else:
         print(f"Signup failed for email: {email}")

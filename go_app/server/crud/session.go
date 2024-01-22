@@ -52,8 +52,9 @@ func CreateSession(ctx context.Context, db *sql.DB, session *schemas.Session) er
 
 func ExpireActiveSessions(ctx context.Context, db *sql.DB, platformClientId string, sessionId string) (bool, error) {
 
+	fmt.Printf("ExpireActiveSessions is getting triggered!")
 	_, err := db.ExecContext(
-		ctx, "Delete from sessions where platform_client_id != ? and id != ?;", platformClientId, sessionId)
+		ctx, "Delete from sessions where id = ?;", platformClientId, sessionId)
 	if err != nil {
 		return false, fmt.Errorf("ExpireActiveSessions: %v", err)
 	}
